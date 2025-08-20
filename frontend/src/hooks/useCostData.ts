@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { costApi } from '../services/api';
 import { CostDataResponse, FilterState } from '../types/billing';
 
@@ -7,7 +7,7 @@ export const useCostData = (filters: FilterState) => {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  const fetchData = async () => {
+  const fetchData = useCallback(async () => {
     setLoading(true);
     setError(null);
     
@@ -26,11 +26,11 @@ export const useCostData = (filters: FilterState) => {
     } finally {
       setLoading(false);
     }
-  };
+  }, [filters.startDate, filters.endDate, filters.granularity, filters.groupByDimension, filters.metrics]);
 
   useEffect(() => {
     fetchData();
-  }, [filters]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [fetchData]);
 
   return { data, loading, error, refetch: fetchData };
 };
