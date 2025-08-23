@@ -6,6 +6,7 @@ interface DateRangePickerProps {
   endDate: string;
   onStartDateChange: (date: string) => void;
   onEndDateChange: (date: string) => void;
+  onDateRangeChange?: (startDate: string, endDate: string) => void;
   onPresetSelect: (preset: string) => void;
 }
 
@@ -14,6 +15,7 @@ const DateRangePicker: React.FC<DateRangePickerProps> = ({
   endDate,
   onStartDateChange,
   onEndDateChange,
+  onDateRangeChange,
   onPresetSelect
 }) => {
   const presets = [
@@ -26,8 +28,15 @@ const DateRangePicker: React.FC<DateRangePickerProps> = ({
 
   const handlePresetClick = (days: number, value: string) => {
     const range = getDefaultDateRange(days);
-    onStartDateChange(range.start);
-    onEndDateChange(range.end);
+    console.log(`Quick select ${days} days:`, range);
+    
+    // Use the batch update if available, otherwise fall back to individual calls
+    if (onDateRangeChange) {
+      onDateRangeChange(range.start, range.end);
+    } else {
+      onStartDateChange(range.start);
+      onEndDateChange(range.end);
+    }
     onPresetSelect(value);
   };
 

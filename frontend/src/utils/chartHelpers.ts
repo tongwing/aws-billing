@@ -1,4 +1,5 @@
 import { CostDataResponse } from '../types/billing';
+import 'chartjs-adapter-date-fns';
 
 export const generateColors = (count: number): string[] => {
   const colors = [
@@ -23,19 +24,21 @@ export const generateColors = (count: number): string[] => {
   return result;
 };
 
-export const processChartData = (data: CostDataResponse) => {
+export const processChartData = (data: CostDataResponse, useTimeScale: boolean = false) => {
   if (!data.results || data.results.length === 0) {
     return { labels: [], datasets: [] };
   }
 
-  const labels = data.results.map(result => {
-    const date = new Date(result.time_period.start);
-    return date.toLocaleDateString('en-US', { 
-      month: 'short', 
-      day: 'numeric',
-      year: data.granularity === 'MONTHLY' ? 'numeric' : undefined
+  const labels = useTimeScale ? 
+    data.results.map(result => result.time_period.start) :
+    data.results.map(result => {
+      const date = new Date(result.time_period.start);
+      return date.toLocaleDateString('en-US', { 
+        month: 'short', 
+        day: 'numeric',
+        year: data.granularity === 'MONTHLY' ? 'numeric' : undefined
+      });
     });
-  });
 
   // If grouping is enabled
   if (data.group_by && data.group_by.length > 0 && data.results[0].groups.length > 0) {
@@ -53,10 +56,19 @@ export const processChartData = (data: CostDataResponse) => {
     const colors = generateColors(sortedKeys.length);
 
     const datasets = sortedKeys.map((key, index) => {
-      const dataPoints = data.results.map(result => {
-        const group = result.groups.find(g => g.keys[0] === key);
-        return group?.metrics.BlendedCost ? parseFloat(group.metrics.BlendedCost.amount) : 0;
-      });
+      const dataPoints = useTimeScale ? 
+        data.results.map(result => {
+          const group = result.groups.find(g => g.keys[0] === key);
+          const amount = group?.metrics.BlendedCost ? parseFloat(group.metrics.BlendedCost.amount) : 0;
+          return {
+            x: result.time_period.start,
+            y: amount
+          };
+        }) :
+        data.results.map(result => {
+          const group = result.groups.find(g => g.keys[0] === key);
+          return group?.metrics.BlendedCost ? parseFloat(group.metrics.BlendedCost.amount) : 0;
+        });
 
       return {
         label: key,
@@ -75,11 +87,18 @@ export const processChartData = (data: CostDataResponse) => {
       return result.total?.BlendedCost ? parseFloat(result.total.BlendedCost.amount) : 0;
     });
 
+    const totalDataPoints = useTimeScale ?
+      data.results.map((result, index) => ({
+        x: result.time_period.start,
+        y: totalData[index]
+      })) :
+      totalData;
+
     return {
       labels,
       datasets: [{
         label: 'Total Cost',
-        data: totalData,
+        data: totalDataPoints,
         backgroundColor: '#3B82F6',
         borderColor: '#3B82F6',
         borderWidth: 2,
@@ -89,18 +108,19 @@ export const processChartData = (data: CostDataResponse) => {
   }
 };
 
-export const getChartOptions = (type: 'bar' | 'line' = 'bar') => {
+export const getChartOptions = (type: 'bar' | 'line' = 'bar', useTimeScale: boolean = false, hasGrouping: boolean = false) => {
   const isStacked = type === 'bar';
   
-  return {
+  const baseOptions = {
     responsive: true,
     maintainAspectRatio: false,
     plugins: {
       legend: {
-        position: 'top' as const,
+        position: hasGrouping ? 'bottom' as const : 'top' as const,
         labels: {
           usePointStyle: true,
-          padding: 20,
+          padding: hasGrouping ? 12 : 20,
+          boxWidth: hasGrouping ? 12 : 16,
         }
       },
       tooltip: {
@@ -109,12 +129,38 @@ export const getChartOptions = (type: 'bar' | 'line' = 'bar') => {
             const label = context.dataset.label || '';
             const value = context.parsed.y;
             return `${label}: $${value.toFixed(2)}`;
+          },
+          title: (context: any) => {
+            if (useTimeScale) {
+              return new Date(context[0].parsed.x).toLocaleDateString('en-US', {
+                year: 'numeric',
+                month: 'short',
+                day: 'numeric'
+              });
+            }
+            return context[0].label;
           }
         }
       }
     },
     scales: {
-      x: {
+      x: useTimeScale ? {
+        type: 'time' as const,
+        time: {
+          unit: 'day' as const,
+          displayFormats: {
+            day: 'MMM dd'
+          }
+        },
+        stacked: isStacked,
+        grid: {
+          display: false,
+        },
+        ticks: {
+          maxRotation: 45,
+        }
+      } : {
+        stacked: isStacked,
         grid: {
           display: false,
         },
@@ -139,6 +185,13 @@ export const getChartOptions = (type: 'bar' | 'line' = 'bar') => {
       bar: {
         borderRadius: 4,
         borderSkipped: false,
+      },
+      line: {
+        tension: 0.1,
+      },
+      point: {
+        radius: 4,
+        hoverRadius: 6,
       }
     },
     datasets: isStacked ? {
@@ -146,6 +199,12 @@ export const getChartOptions = (type: 'bar' | 'line' = 'bar') => {
         barPercentage: 0.8,
         categoryPercentage: 0.9,
       }
-    } : {}
+    } : {},
+    interaction: {
+      mode: 'index' as const,
+      intersect: false,
+    }
   };
+
+  return baseOptions;
 };

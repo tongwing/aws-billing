@@ -62,7 +62,6 @@ Build a real-time AWS billing dashboard web application that tracks cloud usage 
 
 ### 4. Additional Features
 - **Export Functionality**: CSV/Excel export of filtered data
-- **Cost Alerts**: Configurable spending thresholds
 - **Summary Cards**: Total cost, daily average, trend indicators
 - **Search**: Quick search across services and accounts
 - **Bookmarks**: Save frequently used filter combinations
@@ -157,7 +156,6 @@ src/
 
 ### Phase 4: Enhancement Features
 1. Add export functionality (CSV/Excel)
-2. Implement cost alerts and notifications
 3. Add comparison mode (period-over-period)
 4. Build summary cards with key metrics
 5. Add bookmark/save filter combinations

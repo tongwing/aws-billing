@@ -44,7 +44,16 @@ export interface HealthResponse {
 export interface FilterState {
   startDate: string;
   endDate: string;
-  granularity: 'DAILY' | 'WEEKLY' | 'MONTHLY';
+  granularity: 'DAILY' | 'MONTHLY';
   groupByDimension?: string;
   metrics: string[];
+  serviceFilter?: string;
+  regionFilter?: string;
+  chargeType?: string;
+  includeSupport: boolean;
+  includeOtherSubscription: boolean;
+  includeUpfront: boolean;
+  includeRefund: boolean;
+  includeCredit: boolean;
+  includeRiFee: boolean;
 }

@@ -22,6 +22,15 @@ export const costApi = {
     granularity?: string;
     group_by_dimension?: string;
     metrics?: string;
+    service_filter?: string;
+    region_filter?: string;
+    charge_type?: string;
+    include_support?: boolean;
+    include_other_subscription?: boolean;
+    include_upfront?: boolean;
+    include_refund?: boolean;
+    include_credit?: boolean;
+    include_ri_fee?: boolean;
   }): Promise<CostDataResponse> => {
     const response = await api.get<CostDataResponse>('/cost-data', { params });
     return response.data;

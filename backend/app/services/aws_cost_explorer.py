@@ -30,6 +30,19 @@ class AWSCostExplorerService:
             logger.error(f"Failed to initialize AWS Cost Explorer client: {e}")
             self.client = None
     
+    def _refresh_client_if_needed(self, error_message: str) -> bool:
+        """Refresh the client if credentials are expired"""
+        if "ExpiredTokenException" in error_message or "expired" in error_message.lower():
+            logger.info("AWS credentials expired, refreshing client...")
+            old_client = self.client
+            self._initialize_client()
+            if self.client != old_client:
+                logger.info("AWS client refreshed successfully")
+                return True
+            else:
+                logger.warning("Failed to refresh AWS client")
+        return False
+    
     def is_configured(self) -> bool:
         return self.client is not None
     
@@ -107,8 +120,67 @@ class AWSCostExplorerService:
             )
             
         except ClientError as e:
+            error_message = e.response['Error']['Message']
             logger.error(f"AWS API error: {e}")
-            raise ValueError(f"AWS API error: {e.response['Error']['Message']}")
+            
+            # Try to refresh credentials if they're expired
+            if self._refresh_client_if_needed(error_message):
+                try:
+                    # Retry the operation with refreshed credentials
+                    response = self.client.get_cost_and_usage(**aws_request)
+                    
+                    # Transform AWS response to our model (same logic as above)
+                    results = []
+                    for result in response.get('ResultsByTime', []):
+                        groups = []
+                        for group in result.get('Groups', []):
+                            # Extract metrics
+                            metrics_data = {}
+                            for metric_name, metric_value in group.get('Metrics', {}).items():
+                                metrics_data[metric_name] = Metrics(
+                                    amount=metric_value.get('Amount', '0'),
+                                    unit=metric_value.get('Unit', 'USD')
+                                )
+                            
+                            groups.append(Group(
+                                keys=group.get('Keys', []),
+                                metrics=GroupMetrics(**metrics_data)
+                            ))
+                        
+                        # Extract total metrics if no grouping
+                        total_metrics = None
+                        if 'Total' in result:
+                            total_data = {}
+                            for metric_name, metric_value in result['Total'].items():
+                                total_data[metric_name] = Metrics(
+                                    amount=metric_value.get('Amount', '0'),
+                                    unit=metric_value.get('Unit', 'USD')
+                                )
+                            total_metrics = GroupMetrics(**total_data)
+                        
+                        results.append(ResultByTime(
+                            time_period=TimePeriod(
+                                start=result['TimePeriod']['Start'],
+                                end=result['TimePeriod']['End']
+                            ),
+                            total=total_metrics,
+                            groups=groups,
+                            estimated=result.get('Estimated', False)
+                        ))
+                    
+                    return CostDataResponse(
+                        time_period=request.time_period,
+                        granularity=request.granularity,
+                        group_by=request.group_by,
+                        results=results,
+                        next_page_token=response.get('NextPageToken')
+                    )
+                    
+                except Exception as retry_e:
+                    logger.error(f"Retry after credential refresh failed: {retry_e}")
+                    raise ValueError(f"AWS API error (retry failed): {error_message}")
+            
+            raise ValueError(f"AWS API error: {error_message}")
         except Exception as e:
             logger.error(f"Unexpected error in get_cost_and_usage: {e}")
             raise ValueError(f"Failed to retrieve cost data: {str(e)}")
@@ -129,8 +201,27 @@ class AWSCostExplorerService:
             return [item['Value'] for item in response.get('DimensionValues', [])]
             
         except ClientError as e:
+            error_message = e.response['Error']['Message']
             logger.error(f"AWS API error getting dimension values: {e}")
-            raise ValueError(f"AWS API error: {e.response['Error']['Message']}")
+            
+            # Try to refresh credentials if they're expired
+            if self._refresh_client_if_needed(error_message):
+                try:
+                    # Retry the operation with refreshed credentials
+                    response = self.client.get_dimension_values(
+                        TimePeriod={
+                            'Start': time_period.start,
+                            'End': time_period.end
+                        },
+                        Dimension=dimension
+                    )
+                    return [item['Value'] for item in response.get('DimensionValues', [])]
+                    
+                except Exception as retry_e:
+                    logger.error(f"Retry after credential refresh failed: {retry_e}")
+                    raise ValueError(f"AWS API error (retry failed): {error_message}")
+            
+            raise ValueError(f"AWS API error: {error_message}")
         except Exception as e:
             logger.error(f"Unexpected error in get_dimension_values: {e}")
             raise ValueError(f"Failed to retrieve dimension values: {str(e)}")

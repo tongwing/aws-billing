@@ -18,10 +18,24 @@ const FilterPanel: React.FC<FilterPanelProps> = ({
   const [, setSelectedPreset] = useState('30');
 
   const updateFilter = (key: keyof FilterState, value: any) => {
-    onFiltersChange({
+    console.log(`Updating filter ${key}:`, value);
+    const newFilters = {
       ...filters,
       [key]: value
-    });
+    };
+    console.log('New filters:', newFilters);
+    onFiltersChange(newFilters);
+  };
+
+  const updateDateRange = (startDate: string, endDate: string) => {
+    console.log(`Updating date range: ${startDate} to ${endDate}`);
+    const newFilters = {
+      ...filters,
+      startDate,
+      endDate
+    };
+    console.log('New filters with date range:', newFilters);
+    onFiltersChange(newFilters);
   };
 
   const dimensionOptions = [
@@ -32,6 +46,7 @@ const FilterPanel: React.FC<FilterPanelProps> = ({
     { value: 'USAGE_TYPE', label: 'Usage Type' },
     { value: 'INSTANCE_TYPE', label: 'Instance Type' },
     { value: 'PLATFORM', label: 'Platform' },
+    { value: 'RECORD_TYPE', label: 'Record Type' },
   ];
 
   const metricsOptions = [
@@ -74,7 +89,6 @@ const FilterPanel: React.FC<FilterPanelProps> = ({
               className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
             >
               <option value="DAILY">Daily</option>
-              <option value="WEEKLY">Weekly</option>
               <option value="MONTHLY">Monthly</option>
             </select>
           </div>
@@ -84,6 +98,7 @@ const FilterPanel: React.FC<FilterPanelProps> = ({
             endDate={filters.endDate}
             onStartDateChange={(date) => updateFilter('startDate', date)}
             onEndDateChange={(date) => updateFilter('endDate', date)}
+            onDateRangeChange={updateDateRange}
             onPresetSelect={setSelectedPreset}
           />
         </div>
@@ -144,6 +159,88 @@ const FilterPanel: React.FC<FilterPanelProps> = ({
         </div>
       </div>
 
+      {/* Advanced Filters Section */}
+      <div>
+        <h3 className="text-lg font-medium text-gray-900 mb-3 flex items-center">
+          <span className="mr-2">🎯</span>
+          Advanced Filters
+        </h3>
+        
+        <div className="space-y-4">
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-2">
+              Service Filter
+            </label>
+            <input
+              type="text"
+              value={filters.serviceFilter || ''}
+              onChange={(e) => updateFilter('serviceFilter', e.target.value || undefined)}
+              placeholder="e.g., Amazon EC2"
+              className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+            />
+          </div>
+
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-2">
+              Region Filter
+            </label>
+            <input
+              type="text"
+              value={filters.regionFilter || ''}
+              onChange={(e) => updateFilter('regionFilter', e.target.value || undefined)}
+              placeholder="e.g., us-east-1"
+              className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+            />
+          </div>
+
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-2">
+              Charge Type
+            </label>
+            <select
+              value={filters.chargeType || ''}
+              onChange={(e) => updateFilter('chargeType', e.target.value || undefined)}
+              className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+            >
+              <option value="">All Charges</option>
+              <option value="Usage">Usage</option>
+              <option value="Tax">Tax</option>
+              <option value="Credit">Credit</option>
+              <option value="Refund">Refund</option>
+              <option value="Fee">Fee</option>
+              <option value="RIFee">RI Fee</option>
+              <option value="Support">Support</option>
+            </select>
+          </div>
+
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-3">
+              Charge Type Inclusions
+            </label>
+            <div className="space-y-2">
+              {[
+                { key: 'includeSupport', label: 'Support charges' },
+                { key: 'includeOtherSubscription', label: 'Other subscription costs' },
+                { key: 'includeUpfront', label: 'Upfront reservation fees' },
+                { key: 'includeRefund', label: 'Refunds' },
+                { key: 'includeCredit', label: 'Credits' },
+                { key: 'includeRiFee', label: 'Reserved instance fees' },
+              ].map(({ key, label }) => (
+                <label key={key} className="flex items-center space-x-2 text-sm">
+                  <input
+                    type="checkbox"
+                    checked={filters[key as keyof FilterState] as boolean}
+                    onChange={(e) => updateFilter(key as keyof FilterState, e.target.checked)}
+                    className="rounded border-gray-300"
+                  />
+                  <span className="text-gray-700">{label}</span>
+                </label>
+              ))}
+            </div>
+          </div>
+        </div>
+      </div>
+
       {/* Current Selection Summary */}
       <div className="bg-gray-50 p-4 rounded-lg border-t">
         <h4 className="text-sm font-medium text-gray-700 mb-2">Current Selection</h4>
@@ -151,6 +248,9 @@ const FilterPanel: React.FC<FilterPanelProps> = ({
           <div>📅 {filters.granularity.toLowerCase()} from {new Date(filters.startDate).toLocaleDateString()} to {new Date(filters.endDate).toLocaleDateString()}</div>
           <div>📊 {filters.groupByDimension ? `Grouped by ${filters.groupByDimension.toLowerCase().replace('_', ' ')}` : 'Total costs'}</div>
           <div>💰 Showing {filters.metrics[0]?.toLowerCase().replace(/([A-Z])/g, ' $1').trim() || 'blended cost'}</div>
+          {filters.serviceFilter && <div>🔧 Service: {filters.serviceFilter}</div>}
+          {filters.regionFilter && <div>🌍 Region: {filters.regionFilter}</div>}
+          {filters.chargeType && <div>💳 Charge type: {filters.chargeType}</div>}
         </div>
       </div>
     </div>

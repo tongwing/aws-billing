@@ -6,6 +6,7 @@ import LoadingSpinner from '../Common/LoadingSpinner';
 import CostChart from './CostChart';
 import FilterPanel from './FilterPanel';
 import SummaryCards from './SummaryCards';
+import ServiceBreakdown from './ServiceBreakdown';
 
 const Dashboard: React.FC = () => {
   const [filters, setFilters] = useState<FilterState>(() => {
@@ -15,10 +16,22 @@ const Dashboard: React.FC = () => {
       endDate: defaultRange.end,
       granularity: 'DAILY',
       metrics: ['BlendedCost'],
+      includeSupport: true,
+      includeOtherSubscription: true,
+      includeUpfront: true,
+      includeRefund: true,
+      includeCredit: false,
+      includeRiFee: true,
     };
   });
+  const [activeTab, setActiveTab] = useState<'overview' | 'services'>('overview');
 
   const { data, loading, error, refetch } = useCostData(filters);
+
+  const handleFiltersChange = (newFilters: FilterState) => {
+    console.log('Dashboard receiving new filters:', newFilters);
+    setFilters(newFilters);
+  };
 
   const handleRefresh = () => {
     refetch();
@@ -55,23 +68,54 @@ const Dashboard: React.FC = () => {
           <SummaryCards data={data} loading={loading} />
         </div>
 
+        {/* Tabs Navigation */}
+        <div className="mb-6">
+          <nav className="flex space-x-8">
+            <button
+              onClick={() => setActiveTab('overview')}
+              className={`py-2 px-1 border-b-2 font-medium text-sm ${
+                activeTab === 'overview'
+                  ? 'border-blue-500 text-blue-600'
+                  : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+              }`}
+            >
+              📊 Overview
+            </button>
+            <button
+              onClick={() => setActiveTab('services')}
+              className={`py-2 px-1 border-b-2 font-medium text-sm ${
+                activeTab === 'services'
+                  ? 'border-blue-500 text-blue-600'
+                  : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+              }`}
+            >
+              🔧 Service Breakdown
+            </button>
+          </nav>
+        </div>
+
         {/* Main Content */}
         <div className="grid grid-cols-1 xl:grid-cols-4 gap-6">
           {/* Chart and Main Content Area */}
           <div className="xl:col-span-3 space-y-6">
-            {/* Cost Chart */}
-            <div className="bg-white rounded-lg shadow-sm border">
-              <div className="p-6">
-                <CostChart data={data} loading={loading} />
+            {activeTab === 'overview' && (
+              <div className="bg-white rounded-lg shadow-sm border">
+                <div className="p-6">
+                  <CostChart data={data} loading={loading} />
+                </div>
               </div>
-            </div>
+            )}
+
+            {activeTab === 'services' && (
+              <ServiceBreakdown data={data} loading={loading} />
+            )}
           </div>
 
           {/* Filter Panel */}
           <div className="xl:col-span-1">
             <FilterPanel
               filters={filters}
-              onFiltersChange={setFilters}
+              onFiltersChange={handleFiltersChange}
               onRefresh={handleRefresh}
               loading={loading}
             />

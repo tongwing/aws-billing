@@ -3,6 +3,7 @@ import {
   Chart as ChartJS,
   CategoryScale,
   LinearScale,
+  TimeScale,
   BarElement,
   LineElement,
   PointElement,
@@ -14,10 +15,12 @@ import {
 import { Bar, Line } from 'react-chartjs-2';
 import { CostDataResponse } from '../../types/billing';
 import { processChartData, getChartOptions } from '../../utils/chartHelpers';
+import ExportButton from '../Common/ExportButton';
 
 ChartJS.register(
   CategoryScale,
   LinearScale,
+  TimeScale,
   BarElement,
   LineElement,
   PointElement,
@@ -33,15 +36,22 @@ interface CostChartProps {
 
 const CostChart: React.FC<CostChartProps> = ({ data, loading }) => {
   const [chartType, setChartType] = useState<'bar' | 'line'>('bar');
+  const [useTimeScale, setUseTimeScale] = useState(false);
 
   const chartData = useMemo(() => {
     if (!data) return { labels: [], datasets: [] };
-    return processChartData(data);
-  }, [data]);
+    console.log('Chart data updated:', {
+      time_period: data.time_period,
+      results_count: data.results?.length,
+      first_result: data.results?.[0]?.time_period
+    });
+    return processChartData(data, useTimeScale);
+  }, [data, useTimeScale]);
 
   const chartOptions = useMemo(() => {
-    return getChartOptions(chartType);
-  }, [chartType]);
+    const hasGrouping = data?.group_by && data.group_by.length > 0;
+    return getChartOptions(chartType, useTimeScale, hasGrouping);
+  }, [chartType, useTimeScale, data?.group_by]);
 
   if (loading) {
     return (
@@ -66,42 +76,66 @@ const CostChart: React.FC<CostChartProps> = ({ data, loading }) => {
 
   return (
     <div className="space-y-4">
-      {/* Chart Type Toggle */}
+      {/* Chart Controls */}
       <div className="flex items-center justify-between">
         <h2 className="text-xl font-semibold text-gray-900">Cost and Usage Graph</h2>
-        <div className="flex items-center space-x-2">
-          <span className="text-sm text-gray-600">View:</span>
-          <div className="flex rounded-lg border border-gray-300 overflow-hidden">
-            <button
-              onClick={() => setChartType('bar')}
-              className={`px-3 py-1 text-sm font-medium ${
-                chartType === 'bar'
-                  ? 'bg-blue-600 text-white'
-                  : 'bg-white text-gray-700 hover:bg-gray-50'
-              }`}
-            >
-              📊 Bar
-            </button>
-            <button
-              onClick={() => setChartType('line')}
-              className={`px-3 py-1 text-sm font-medium border-l border-gray-300 ${
-                chartType === 'line'
-                  ? 'bg-blue-600 text-white'
-                  : 'bg-white text-gray-700 hover:bg-gray-50'
-              }`}
-            >
-              📈 Line
-            </button>
+        <div className="flex items-center space-x-4">
+          <div className="flex items-center space-x-2">
+            <span className="text-sm text-gray-600">View:</span>
+            <div className="flex rounded-lg border border-gray-300 overflow-hidden">
+              <button
+                onClick={() => setChartType('bar')}
+                className={`px-3 py-1 text-sm font-medium ${
+                  chartType === 'bar'
+                    ? 'bg-blue-600 text-white'
+                    : 'bg-white text-gray-700 hover:bg-gray-50'
+                }`}
+              >
+                📊 Bar
+              </button>
+              <button
+                onClick={() => setChartType('line')}
+                className={`px-3 py-1 text-sm font-medium border-l border-gray-300 ${
+                  chartType === 'line'
+                    ? 'bg-blue-600 text-white'
+                    : 'bg-white text-gray-700 hover:bg-gray-50'
+                }`}
+              >
+                📈 Line
+              </button>
+            </div>
           </div>
+
+          <div className="flex items-center space-x-2">
+            <label className="flex items-center space-x-1 text-sm text-gray-600">
+              <input
+                type="checkbox"
+                checked={useTimeScale}
+                onChange={(e) => setUseTimeScale(e.target.checked)}
+                className="rounded border-gray-300"
+              />
+              <span>Time Scale</span>
+            </label>
+          </div>
+
+          <ExportButton data={data} disabled={loading} />
         </div>
       </div>
 
       {/* Chart Container */}
       <div className="h-96 bg-white p-4 rounded-lg border">
         {chartType === 'bar' ? (
-          <Bar data={chartData} options={chartOptions as ChartOptions<'bar'>} />
+          <Bar 
+            key={`${data?.time_period.start}-${data?.time_period.end}-${chartType}-${useTimeScale}`}
+            data={chartData} 
+            options={chartOptions as ChartOptions<'bar'>} 
+          />
         ) : (
-          <Line data={chartData} options={chartOptions as ChartOptions<'line'>} />
+          <Line 
+            key={`${data?.time_period.start}-${data?.time_period.end}-${chartType}-${useTimeScale}`}
+            data={chartData} 
+            options={chartOptions as ChartOptions<'line'>} 
+          />
         )}
       </div>
 

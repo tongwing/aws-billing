@@ -11,6 +11,12 @@ export const useCostData = (filters: FilterState) => {
     setLoading(true);
     setError(null);
     
+    console.log('Fetching cost data with filters:', {
+      start_date: filters.startDate,
+      end_date: filters.endDate,
+      granularity: filters.granularity
+    });
+    
     try {
       const response = await costApi.getCostData({
         start_date: filters.startDate,
@@ -18,6 +24,15 @@ export const useCostData = (filters: FilterState) => {
         granularity: filters.granularity,
         group_by_dimension: filters.groupByDimension,
         metrics: filters.metrics.join(','),
+        service_filter: filters.serviceFilter,
+        region_filter: filters.regionFilter,
+        charge_type: filters.chargeType,
+        include_support: filters.includeSupport,
+        include_other_subscription: filters.includeOtherSubscription,
+        include_upfront: filters.includeUpfront,
+        include_refund: filters.includeRefund,
+        include_credit: filters.includeCredit,
+        include_ri_fee: filters.includeRiFee,
       });
       
       setData(response);
@@ -26,7 +41,22 @@ export const useCostData = (filters: FilterState) => {
     } finally {
       setLoading(false);
     }
-  }, [filters.startDate, filters.endDate, filters.granularity, filters.groupByDimension, filters.metrics]);
+  }, [
+    filters.startDate,
+    filters.endDate,
+    filters.granularity,
+    filters.groupByDimension,
+    filters.metrics,
+    filters.serviceFilter,
+    filters.regionFilter,
+    filters.chargeType,
+    filters.includeSupport,
+    filters.includeOtherSubscription,
+    filters.includeUpfront,
+    filters.includeRefund,
+    filters.includeCredit,
+    filters.includeRiFee
+  ]);
 
   useEffect(() => {
     fetchData();
