@@ -17,15 +17,17 @@ class AWSCostExplorerService:
     def _initialize_client(self):
         try:
             if settings.aws_access_key_id and settings.aws_secret_access_key:
-                self.client = boto3.client(
-                    'ce',
+                # Use explicit session to avoid credential caching issues
+                session = boto3.Session(
                     aws_access_key_id=settings.aws_access_key_id,
                     aws_secret_access_key=settings.aws_secret_access_key,
                     region_name=settings.aws_region
                 )
+                self.client = session.client('ce')
             else:
                 # Try to use default credentials (IAM role, profile, etc.)
-                self.client = boto3.client('ce', region_name=settings.aws_region)
+                session = boto3.Session(region_name=settings.aws_region)
+                self.client = session.client('ce')
         except Exception as e:
             logger.error(f"Failed to initialize AWS Cost Explorer client: {e}")
             self.client = None
@@ -33,14 +35,34 @@ class AWSCostExplorerService:
     def _refresh_client_if_needed(self, error_message: str) -> bool:
         """Refresh the client if credentials are expired"""
         if "ExpiredTokenException" in error_message or "expired" in error_message.lower():
-            logger.info("AWS credentials expired, refreshing client...")
-            old_client = self.client
-            self._initialize_client()
-            if self.client != old_client:
-                logger.info("AWS client refreshed successfully")
+            logger.info("AWS credentials expired, forcing client refresh...")
+            
+            # Force clear any cached credentials by recreating the client completely
+            self.client = None
+            
+            try:
+                # Recreate client with fresh session
+                if settings.aws_access_key_id and settings.aws_secret_access_key:
+                    # Use a new session to avoid credential caching
+                    session = boto3.Session(
+                        aws_access_key_id=settings.aws_access_key_id,
+                        aws_secret_access_key=settings.aws_secret_access_key,
+                        region_name=settings.aws_region
+                    )
+                    self.client = session.client('ce')
+                    logger.info("AWS client recreated with new session")
+                else:
+                    # Use default credentials with new session
+                    session = boto3.Session(region_name=settings.aws_region)
+                    self.client = session.client('ce')
+                    logger.info("AWS client recreated with default credentials")
+                
                 return True
-            else:
-                logger.warning("Failed to refresh AWS client")
+                
+            except Exception as e:
+                logger.error(f"Failed to refresh AWS client: {e}")
+                self.client = None
+                return False
         return False
     
     def is_configured(self) -> bool:

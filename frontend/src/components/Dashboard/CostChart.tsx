@@ -127,43 +127,6 @@ const CostChart: React.FC<CostChartProps> = ({ data, loading }) => {
         )}
       </div>
 
-      {/* Chart Summary */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mt-4">
-        <div className="bg-blue-50 p-4 rounded-lg">
-          <div className="text-sm text-blue-600 font-medium">Total Period</div>
-          <div className="text-2xl font-bold text-blue-900">
-            ${data.results.reduce((sum, result) => {
-              if (result.total?.BlendedCost) {
-                return sum + parseFloat(result.total.BlendedCost.amount);
-              }
-              return sum + result.groups.reduce((groupSum, group) => {
-                return groupSum + (group.metrics.BlendedCost ? parseFloat(group.metrics.BlendedCost.amount) : 0);
-              }, 0);
-            }, 0).toFixed(2)}
-          </div>
-        </div>
-        
-        <div className="bg-green-50 p-4 rounded-lg">
-          <div className="text-sm text-green-600 font-medium">Daily Average</div>
-          <div className="text-2xl font-bold text-green-900">
-            ${(data.results.reduce((sum, result) => {
-              if (result.total?.BlendedCost) {
-                return sum + parseFloat(result.total.BlendedCost.amount);
-              }
-              return sum + result.groups.reduce((groupSum, group) => {
-                return groupSum + (group.metrics.BlendedCost ? parseFloat(group.metrics.BlendedCost.amount) : 0);
-              }, 0);
-            }, 0) / data.results.length).toFixed(2)}
-          </div>
-        </div>
-
-        <div className="bg-amber-50 p-4 rounded-lg">
-          <div className="text-sm text-amber-600 font-medium">Time Period</div>
-          <div className="text-lg font-bold text-amber-900">
-            {data.results.length} {data.granularity.toLowerCase()} periods
-          </div>
-        </div>
-      </div>
     </div>
   );
 };

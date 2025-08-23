@@ -12,9 +12,9 @@ const SummaryCards: React.FC<SummaryCardsProps> = ({ data, loading }) => {
     return (
       <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
         {Array.from({ length: 4 }).map((_, index) => (
-          <div key={index} className="bg-white p-6 rounded-lg shadow animate-pulse">
-            <div className="h-4 bg-gray-200 rounded w-3/4 mb-2"></div>
-            <div className="h-8 bg-gray-200 rounded w-1/2"></div>
+          <div key={index} className="bg-white p-4 rounded-lg shadow animate-pulse">
+            <div className="h-3 bg-gray-200 rounded w-3/4 mb-2"></div>
+            <div className="h-6 bg-gray-200 rounded w-1/2"></div>
           </div>
         ))}
       </div>
@@ -24,7 +24,7 @@ const SummaryCards: React.FC<SummaryCardsProps> = ({ data, loading }) => {
   if (!data || !data.results || data.results.length === 0) {
     return (
       <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-        <div className="bg-white p-6 rounded-lg shadow border-2 border-dashed border-gray-300">
+        <div className="bg-white p-4 rounded-lg shadow border-2 border-dashed border-gray-300">
           <div className="text-center text-gray-500">No data available</div>
         </div>
       </div>
@@ -108,13 +108,13 @@ const SummaryCards: React.FC<SummaryCardsProps> = ({ data, loading }) => {
       {cards.map((card, index) => (
         <div
           key={index}
-          className={`p-6 rounded-lg border-2 ${getColorClasses(card.color)} transition-transform hover:scale-105`}
+          className={`p-4 rounded-lg border-2 ${getColorClasses(card.color)} transition-transform hover:scale-105`}
         >
-          <div className="flex items-center justify-between mb-2">
+          <div className="flex items-center justify-between mb-1">
             <div className="text-sm font-medium opacity-80">{card.title}</div>
-            <div className="text-xl">{card.icon}</div>
+            <div className="text-lg">{card.icon}</div>
           </div>
-          <div className="text-2xl font-bold mb-1">{card.value}</div>
+          <div className="text-xl font-bold mb-1">{card.value}</div>
           <div className="text-xs opacity-70">{card.subtitle}</div>
         </div>
       ))}
