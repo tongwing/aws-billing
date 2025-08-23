@@ -36,7 +36,6 @@ interface CostChartProps {
 
 const CostChart: React.FC<CostChartProps> = ({ data, loading }) => {
   const [chartType, setChartType] = useState<'bar' | 'line'>('bar');
-  const [useTimeScale, setUseTimeScale] = useState(false);
 
   const chartData = useMemo(() => {
     if (!data) return { labels: [], datasets: [] };
@@ -45,13 +44,13 @@ const CostChart: React.FC<CostChartProps> = ({ data, loading }) => {
       results_count: data.results?.length,
       first_result: data.results?.[0]?.time_period
     });
-    return processChartData(data, useTimeScale);
-  }, [data, useTimeScale]);
+    return processChartData(data);
+  }, [data]);
 
   const chartOptions = useMemo(() => {
     const hasGrouping = data?.group_by && data.group_by.length > 0;
-    return getChartOptions(chartType, useTimeScale, hasGrouping);
-  }, [chartType, useTimeScale, data?.group_by]);
+    return getChartOptions(chartType, hasGrouping);
+  }, [chartType, data?.group_by]);
 
   if (loading) {
     return (
@@ -106,17 +105,6 @@ const CostChart: React.FC<CostChartProps> = ({ data, loading }) => {
             </div>
           </div>
 
-          <div className="flex items-center space-x-2">
-            <label className="flex items-center space-x-1 text-sm text-gray-600">
-              <input
-                type="checkbox"
-                checked={useTimeScale}
-                onChange={(e) => setUseTimeScale(e.target.checked)}
-                className="rounded border-gray-300"
-              />
-              <span>Time Scale</span>
-            </label>
-          </div>
 
           <ExportButton data={data} disabled={loading} />
         </div>
@@ -126,13 +114,13 @@ const CostChart: React.FC<CostChartProps> = ({ data, loading }) => {
       <div className="h-96 bg-white p-4 rounded-lg border">
         {chartType === 'bar' ? (
           <Bar 
-            key={`${data?.time_period.start}-${data?.time_period.end}-${chartType}-${useTimeScale}`}
+            key={`${data?.time_period.start}-${data?.time_period.end}-${chartType}`}
             data={chartData} 
             options={chartOptions as ChartOptions<'bar'>} 
           />
         ) : (
           <Line 
-            key={`${data?.time_period.start}-${data?.time_period.end}-${chartType}-${useTimeScale}`}
+            key={`${data?.time_period.start}-${data?.time_period.end}-${chartType}`}
             data={chartData} 
             options={chartOptions as ChartOptions<'line'>} 
           />

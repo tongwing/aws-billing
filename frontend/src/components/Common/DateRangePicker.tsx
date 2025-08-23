@@ -1,5 +1,5 @@
 import React from 'react';
-import { getDefaultDateRange } from '../../utils/dateHelpers';
+import { getDefaultDateRange, getMonthToDateRange } from '../../utils/dateHelpers';
 
 interface DateRangePickerProps {
   startDate: string;
@@ -21,14 +21,22 @@ const DateRangePicker: React.FC<DateRangePickerProps> = ({
   const presets = [
     { label: 'Last 7 days', value: '7', days: 7 },
     { label: 'Last 30 days', value: '30', days: 30 },
+    { label: 'Month to date', value: 'mtd', days: null },
     { label: 'Last 90 days', value: '90', days: 90 },
     { label: 'Last 6 months', value: '180', days: 180 },
     { label: 'Last year', value: '365', days: 365 },
   ];
 
-  const handlePresetClick = (days: number, value: string) => {
-    const range = getDefaultDateRange(days);
-    console.log(`Quick select ${days} days:`, range);
+  const handlePresetClick = (days: number | null, value: string) => {
+    let range;
+    
+    if (value === 'mtd') {
+      range = getMonthToDateRange();
+      console.log('Quick select month to date:', range);
+    } else {
+      range = getDefaultDateRange(days!);
+      console.log(`Quick select ${days} days:`, range);
+    }
     
     // Use the batch update if available, otherwise fall back to individual calls
     if (onDateRangeChange) {

@@ -1,4 +1,4 @@
-import { format, subDays, startOfDay } from 'date-fns';
+import { format, subDays, startOfDay, startOfMonth } from 'date-fns';
 
 export const formatDate = (date: Date): string => {
   return format(date, 'yyyy-MM-dd');
@@ -7,6 +7,16 @@ export const formatDate = (date: Date): string => {
 export const getDefaultDateRange = (days: number = 30) => {
   const endDate = startOfDay(new Date());
   const startDate = subDays(endDate, days);
+  
+  return {
+    start: formatDate(startDate),
+    end: formatDate(endDate),
+  };
+};
+
+export const getMonthToDateRange = () => {
+  const endDate = startOfDay(new Date());
+  const startDate = startOfMonth(endDate);
   
   return {
     start: formatDate(startDate),

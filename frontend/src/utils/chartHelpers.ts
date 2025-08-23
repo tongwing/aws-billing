@@ -24,21 +24,19 @@ export const generateColors = (count: number): string[] => {
   return result;
 };
 
-export const processChartData = (data: CostDataResponse, useTimeScale: boolean = false) => {
+export const processChartData = (data: CostDataResponse) => {
   if (!data.results || data.results.length === 0) {
     return { labels: [], datasets: [] };
   }
 
-  const labels = useTimeScale ? 
-    data.results.map(result => result.time_period.start) :
-    data.results.map(result => {
-      const date = new Date(result.time_period.start);
-      return date.toLocaleDateString('en-US', { 
-        month: 'short', 
-        day: 'numeric',
-        year: data.granularity === 'MONTHLY' ? 'numeric' : undefined
-      });
+  const labels = data.results.map(result => {
+    const date = new Date(result.time_period.start);
+    return date.toLocaleDateString('en-US', { 
+      month: 'short', 
+      day: 'numeric',
+      year: data.granularity === 'MONTHLY' ? 'numeric' : undefined
     });
+  });
 
   // If grouping is enabled
   if (data.group_by && data.group_by.length > 0 && data.results[0].groups.length > 0) {
@@ -56,19 +54,10 @@ export const processChartData = (data: CostDataResponse, useTimeScale: boolean =
     const colors = generateColors(sortedKeys.length);
 
     const datasets = sortedKeys.map((key, index) => {
-      const dataPoints = useTimeScale ? 
-        data.results.map(result => {
-          const group = result.groups.find(g => g.keys[0] === key);
-          const amount = group?.metrics.BlendedCost ? parseFloat(group.metrics.BlendedCost.amount) : 0;
-          return {
-            x: result.time_period.start,
-            y: amount
-          };
-        }) :
-        data.results.map(result => {
-          const group = result.groups.find(g => g.keys[0] === key);
-          return group?.metrics.BlendedCost ? parseFloat(group.metrics.BlendedCost.amount) : 0;
-        });
+      const dataPoints = data.results.map(result => {
+        const group = result.groups.find(g => g.keys[0] === key);
+        return group?.metrics.BlendedCost ? parseFloat(group.metrics.BlendedCost.amount) : 0;
+      });
 
       return {
         label: key,
@@ -87,18 +76,11 @@ export const processChartData = (data: CostDataResponse, useTimeScale: boolean =
       return result.total?.BlendedCost ? parseFloat(result.total.BlendedCost.amount) : 0;
     });
 
-    const totalDataPoints = useTimeScale ?
-      data.results.map((result, index) => ({
-        x: result.time_period.start,
-        y: totalData[index]
-      })) :
-      totalData;
-
     return {
       labels,
       datasets: [{
         label: 'Total Cost',
-        data: totalDataPoints,
+        data: totalData,
         backgroundColor: '#3B82F6',
         borderColor: '#3B82F6',
         borderWidth: 2,
@@ -108,7 +90,7 @@ export const processChartData = (data: CostDataResponse, useTimeScale: boolean =
   }
 };
 
-export const getChartOptions = (type: 'bar' | 'line' = 'bar', useTimeScale: boolean = false, hasGrouping: boolean = false) => {
+export const getChartOptions = (type: 'bar' | 'line' = 'bar', hasGrouping: boolean = false) => {
   const isStacked = type === 'bar';
   
   const baseOptions = {
@@ -131,35 +113,13 @@ export const getChartOptions = (type: 'bar' | 'line' = 'bar', useTimeScale: bool
             return `${label}: $${value.toFixed(2)}`;
           },
           title: (context: any) => {
-            if (useTimeScale) {
-              return new Date(context[0].parsed.x).toLocaleDateString('en-US', {
-                year: 'numeric',
-                month: 'short',
-                day: 'numeric'
-              });
-            }
             return context[0].label;
           }
         }
       }
     },
     scales: {
-      x: useTimeScale ? {
-        type: 'time' as const,
-        time: {
-          unit: 'day' as const,
-          displayFormats: {
-            day: 'MMM dd'
-          }
-        },
-        stacked: isStacked,
-        grid: {
-          display: false,
-        },
-        ticks: {
-          maxRotation: 45,
-        }
-      } : {
+      x: {
         stacked: isStacked,
         grid: {
           display: false,
