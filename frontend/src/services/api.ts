@@ -46,6 +46,11 @@ export const costApi = {
     const response = await api.get<{ dimension: string; values: string[] }>(`/dimensions/${dimension}`, { params });
     return response.data;
   },
+
+  getAccountInfo: async (): Promise<{ account_id: string; user_id: string; arn: string }> => {
+    const response = await api.get<{ account_id: string; user_id: string; arn: string }>('/account-info');
+    return response.data;
+  },
 };
 
 export default api;

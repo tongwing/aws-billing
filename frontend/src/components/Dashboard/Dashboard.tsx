@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { useCostData } from '../../hooks/useCostData';
+import { useAccountInfo } from '../../hooks/useAccountInfo';
 import { FilterState } from '../../types/billing';
 import { getDefaultDateRange } from '../../utils/dateHelpers';
 import LoadingSpinner from '../Common/LoadingSpinner';
@@ -27,6 +28,7 @@ const Dashboard: React.FC = () => {
   const [activeTab, setActiveTab] = useState<'overview' | 'services'>('overview');
 
   const { data, loading, error, refetch } = useCostData(filters);
+  const { accountInfo } = useAccountInfo();
 
   const handleFiltersChange = (newFilters: FilterState) => {
     console.log('Dashboard receiving new filters:', newFilters);
@@ -59,7 +61,14 @@ const Dashboard: React.FC = () => {
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
         {/* Header */}
         <div className="mb-6">
-          <h1 className="text-3xl font-bold text-gray-900">AWS Billing Dashboard</h1>
+          <h1 className="text-3xl font-bold text-gray-900">
+            AWS Billing Dashboard
+            {accountInfo?.account_id && (
+              <span className="ml-3 text-lg font-normal text-gray-600">
+                ({accountInfo.account_id})
+              </span>
+            )}
+          </h1>
           <p className="mt-2 text-gray-600">Monitor your AWS costs and usage with real-time insights</p>
         </div>
 

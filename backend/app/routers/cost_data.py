@@ -151,3 +151,16 @@ async def get_dimension_values(
         raise HTTPException(status_code=400, detail=str(e))
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Internal server error: {str(e)}")
+
+
+@router.get("/account-info")
+async def get_account_info():
+    """Get AWS account information"""
+    try:
+        account_info = await cost_explorer_service.get_account_info()
+        return account_info
+        
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Internal server error: {str(e)}")

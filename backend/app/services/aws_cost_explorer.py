@@ -247,6 +247,70 @@ class AWSCostExplorerService:
         except Exception as e:
             logger.error(f"Unexpected error in get_dimension_values: {e}")
             raise ValueError(f"Failed to retrieve dimension values: {str(e)}")
+    
+    async def get_account_info(self) -> dict:
+        """Get AWS account information including account ID"""
+        if not self.is_configured():
+            raise ValueError("AWS Cost Explorer client is not properly configured")
+        
+        try:
+            # Use STS to get account information
+            if hasattr(self.client, '_client_config'):
+                # Create STS client with same credentials as Cost Explorer client
+                if settings.aws_access_key_id and settings.aws_secret_access_key:
+                    session = boto3.Session(
+                        aws_access_key_id=settings.aws_access_key_id,
+                        aws_secret_access_key=settings.aws_secret_access_key,
+                        region_name=settings.aws_region
+                    )
+                    sts_client = session.client('sts')
+                else:
+                    session = boto3.Session(region_name=settings.aws_region)
+                    sts_client = session.client('sts')
+                
+                response = sts_client.get_caller_identity()
+                return {
+                    "account_id": response.get('Account'),
+                    "user_id": response.get('UserId'), 
+                    "arn": response.get('Arn')
+                }
+            else:
+                raise ValueError("Unable to determine account information")
+                
+        except ClientError as e:
+            error_message = e.response['Error']['Message']
+            logger.error(f"AWS API error getting account info: {e}")
+            
+            # Try to refresh credentials if they're expired
+            if self._refresh_client_if_needed(error_message):
+                try:
+                    # Retry with refreshed credentials
+                    if settings.aws_access_key_id and settings.aws_secret_access_key:
+                        session = boto3.Session(
+                            aws_access_key_id=settings.aws_access_key_id,
+                            aws_secret_access_key=settings.aws_secret_access_key,
+                            region_name=settings.aws_region
+                        )
+                        sts_client = session.client('sts')
+                    else:
+                        session = boto3.Session(region_name=settings.aws_region)
+                        sts_client = session.client('sts')
+                    
+                    response = sts_client.get_caller_identity()
+                    return {
+                        "account_id": response.get('Account'),
+                        "user_id": response.get('UserId'),
+                        "arn": response.get('Arn')
+                    }
+                    
+                except Exception as retry_e:
+                    logger.error(f"Retry after credential refresh failed: {retry_e}")
+                    raise ValueError(f"AWS API error (retry failed): {error_message}")
+            
+            raise ValueError(f"AWS API error: {error_message}")
+        except Exception as e:
+            logger.error(f"Unexpected error getting account info: {e}")
+            raise ValueError(f"Failed to retrieve account information: {str(e)}")
 
 
 # Global instance
