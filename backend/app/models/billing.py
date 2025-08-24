@@ -1,6 +1,7 @@
 from pydantic import BaseModel
 from typing import List, Dict, Optional, Any
 from datetime import datetime
+from .credentials import AWSCredentials
 
 
 class TimePeriod(BaseModel):
@@ -32,6 +33,7 @@ class ResultByTime(BaseModel):
 
 
 class CostDataRequest(BaseModel):
+    credentials: AWSCredentials
     time_period: TimePeriod
     granularity: str = "DAILY"
     group_by: List[Dict[str, str]] = []
@@ -48,8 +50,16 @@ class CostDataResponse(BaseModel):
     next_page_token: Optional[str] = None
 
 
+class DimensionRequest(BaseModel):
+    credentials: AWSCredentials
+    dimension: str
+    time_period: TimePeriod
+
+
+class AccountInfoRequest(BaseModel):
+    credentials: AWSCredentials
+
+
 class HealthResponse(BaseModel):
     status: str
     timestamp: datetime
-    aws_config: bool
-    aws_error: Optional[str] = None

@@ -1,7 +1,7 @@
 import boto3
 from botocore.exceptions import ClientError, NoCredentialsError
-from app.config import settings
 from app.models.billing import CostDataRequest, CostDataResponse, ResultByTime, Group, GroupMetrics, Metrics, TimePeriod
+from app.models.credentials import AWSCredentials, CredentialValidationResponse
 from typing import Dict, Any, List, Optional
 from datetime import datetime, timedelta
 import logging
@@ -10,82 +10,61 @@ logger = logging.getLogger(__name__)
 
 
 class AWSCostExplorerService:
-    def __init__(self):
-        self.client = None
-        self.credential_error = None
-        self._initialize_client()
+    """Stateless AWS Cost Explorer service that creates clients per request"""
     
-    def _initialize_client(self):
+    def create_client(self, credentials: AWSCredentials, service_name: str = 'ce'):
+        """Create a new AWS client with the provided credentials"""
         try:
-            if settings.aws_access_key_id and settings.aws_secret_access_key:
-                # Use explicit session to avoid credential caching issues
-                session = boto3.Session(
-                    aws_access_key_id=settings.aws_access_key_id,
-                    aws_secret_access_key=settings.aws_secret_access_key,
-                    region_name=settings.aws_region
-                )
-                self.client = session.client('ce')
-        except NoCredentialsError as e:
-            logger.error(f"AWS credentials not found: {e}")
-            self.client = None
-            self.credential_error = "AWS credentials not configured. Please set AWS_ACCESS_KEY_ID and AWS_SECRET_ACCESS_KEY environment variables or configure AWS credentials."
+            session = boto3.Session(
+                aws_access_key_id=credentials.access_key_id,
+                aws_secret_access_key=credentials.secret_access_key,
+                region_name=credentials.region
+            )
+            return session.client(service_name)
+        except Exception as e:
+            logger.error(f"Failed to create AWS {service_name} client: {e}")
+            raise ValueError(f"Failed to create AWS client: {str(e)}")
+    
+    async def validate_credentials(self, credentials: AWSCredentials) -> CredentialValidationResponse:
+        """Validate AWS credentials by making a simple API call"""
+        try:
+            # Create STS client to get caller identity (lightweight operation)
+            sts_client = self.create_client(credentials, 'sts')
+            response = sts_client.get_caller_identity()
+            
+            return CredentialValidationResponse(
+                valid=True,
+                account_id=response.get('Account')
+            )
         except ClientError as e:
             error_code = e.response.get('Error', {}).get('Code', 'Unknown')
+            error_message = e.response.get('Error', {}).get('Message', str(e))
+            
+            logger.error(f"AWS credential validation failed: {e}")
+            
             if error_code in ['InvalidUserID.NotFound', 'SignatureDoesNotMatch', 'InvalidAccessKeyId']:
-                logger.error(f"Invalid AWS credentials: {e}")
-                self.client = None
-                self.credential_error = "Invalid AWS credentials. Please check your AWS_ACCESS_KEY_ID and AWS_SECRET_ACCESS_KEY."
+                return CredentialValidationResponse(
+                    valid=False,
+                    error="Invalid AWS credentials. Please check your Access Key ID and Secret Access Key."
+                )
             else:
-                logger.error(f"AWS API error during initialization: {e}")
-                self.client = None
-                self.credential_error = f"AWS configuration error: {e.response.get('Error', {}).get('Message', str(e))}"
+                return CredentialValidationResponse(
+                    valid=False,
+                    error=f"AWS API error: {error_message}"
+                )
         except Exception as e:
-            logger.error(f"Failed to initialize AWS Cost Explorer client: {e}")
-            self.client = None
-            self.credential_error = f"AWS client initialization failed: {str(e)}"
-    
-    def _refresh_client_if_needed(self, error_message: str) -> bool:
-        """Refresh the client if credentials are expired"""
-        if "ExpiredTokenException" in error_message or "expired" in error_message.lower():
-            logger.info("AWS credentials expired, forcing client refresh...")
-            
-            # Force clear any cached credentials by recreating the client completely
-            self.client = None
-            
-            try:
-                # Recreate client with fresh session
-                if settings.aws_access_key_id and settings.aws_secret_access_key:
-                    # Use a new session to avoid credential caching
-                    session = boto3.Session(
-                        aws_access_key_id=settings.aws_access_key_id,
-                        aws_secret_access_key=settings.aws_secret_access_key,
-                        region_name=settings.aws_region
-                    )
-                    self.client = session.client('ce')
-                    logger.info("AWS client recreated with new session")
-                else:
-                    # Use default credentials with new session
-                    session = boto3.Session(region_name=settings.aws_region)
-                    self.client = session.client('ce')
-                    logger.info("AWS client recreated with default credentials")
-                
-                return True
-                
-            except Exception as e:
-                logger.error(f"Failed to refresh AWS client: {e}")
-                self.client = None
-                return False
-        return False
-    
-    def is_configured(self) -> bool:
-        return self.client is not None
+            logger.error(f"Unexpected error validating credentials: {e}")
+            return CredentialValidationResponse(
+                valid=False,
+                error=f"Failed to validate credentials: {str(e)}"
+            )
     
     async def get_cost_and_usage(self, request: CostDataRequest) -> CostDataResponse:
-        if not self.is_configured():
-            error_msg = self.credential_error or "AWS Cost Explorer client is not properly configured"
-            raise ValueError(error_msg)
-        
+        """Get cost and usage data using the provided credentials"""
         try:
+            # Create Cost Explorer client with provided credentials
+            client = self.create_client(request.credentials)
+            
             # Prepare the request for AWS API
             aws_request = {
                 'TimePeriod': {
@@ -105,7 +84,7 @@ class AWSCostExplorerService:
                 aws_request['Filter'] = request.filter
             
             # Call AWS Cost Explorer API
-            response = self.client.get_cost_and_usage(**aws_request)
+            response = client.get_cost_and_usage(**aws_request)
             
             # Transform AWS response to our model
             results = []
@@ -157,76 +136,17 @@ class AWSCostExplorerService:
         except ClientError as e:
             error_message = e.response['Error']['Message']
             logger.error(f"AWS API error: {e}")
-            
-            # Try to refresh credentials if they're expired
-            if self._refresh_client_if_needed(error_message):
-                try:
-                    # Retry the operation with refreshed credentials
-                    response = self.client.get_cost_and_usage(**aws_request)
-                    
-                    # Transform AWS response to our model (same logic as above)
-                    results = []
-                    for result in response.get('ResultsByTime', []):
-                        groups = []
-                        for group in result.get('Groups', []):
-                            # Extract metrics
-                            metrics_data = {}
-                            for metric_name, metric_value in group.get('Metrics', {}).items():
-                                metrics_data[metric_name] = Metrics(
-                                    amount=metric_value.get('Amount', '0'),
-                                    unit=metric_value.get('Unit', 'USD')
-                                )
-                            
-                            groups.append(Group(
-                                keys=group.get('Keys', []),
-                                metrics=GroupMetrics(**metrics_data)
-                            ))
-                        
-                        # Extract total metrics if no grouping
-                        total_metrics = None
-                        if 'Total' in result:
-                            total_data = {}
-                            for metric_name, metric_value in result['Total'].items():
-                                total_data[metric_name] = Metrics(
-                                    amount=metric_value.get('Amount', '0'),
-                                    unit=metric_value.get('Unit', 'USD')
-                                )
-                            total_metrics = GroupMetrics(**total_data)
-                        
-                        results.append(ResultByTime(
-                            time_period=TimePeriod(
-                                start=result['TimePeriod']['Start'],
-                                end=result['TimePeriod']['End']
-                            ),
-                            total=total_metrics,
-                            groups=groups,
-                            estimated=result.get('Estimated', False)
-                        ))
-                    
-                    return CostDataResponse(
-                        time_period=request.time_period,
-                        granularity=request.granularity,
-                        group_by=request.group_by,
-                        results=results,
-                        next_page_token=response.get('NextPageToken')
-                    )
-                    
-                except Exception as retry_e:
-                    logger.error(f"Retry after credential refresh failed: {retry_e}")
-                    raise ValueError(f"AWS API error (retry failed): {error_message}")
-            
             raise ValueError(f"AWS API error: {error_message}")
         except Exception as e:
             logger.error(f"Unexpected error in get_cost_and_usage: {e}")
             raise ValueError(f"Failed to retrieve cost data: {str(e)}")
     
-    async def get_dimension_values(self, dimension: str, time_period: TimePeriod) -> List[str]:
-        if not self.is_configured():
-            error_msg = self.credential_error or "AWS Cost Explorer client is not properly configured"
-            raise ValueError(error_msg)
-        
+    async def get_dimension_values(self, credentials: AWSCredentials, dimension: str, time_period: TimePeriod) -> List[str]:
+        """Get dimension values using the provided credentials"""
         try:
-            response = self.client.get_dimension_values(
+            client = self.create_client(credentials)
+            
+            response = client.get_dimension_values(
                 TimePeriod={
                     'Start': time_period.start,
                     'End': time_period.end
@@ -239,94 +159,32 @@ class AWSCostExplorerService:
         except ClientError as e:
             error_message = e.response['Error']['Message']
             logger.error(f"AWS API error getting dimension values: {e}")
-            
-            # Try to refresh credentials if they're expired
-            if self._refresh_client_if_needed(error_message):
-                try:
-                    # Retry the operation with refreshed credentials
-                    response = self.client.get_dimension_values(
-                        TimePeriod={
-                            'Start': time_period.start,
-                            'End': time_period.end
-                        },
-                        Dimension=dimension
-                    )
-                    return [item['Value'] for item in response.get('DimensionValues', [])]
-                    
-                except Exception as retry_e:
-                    logger.error(f"Retry after credential refresh failed: {retry_e}")
-                    raise ValueError(f"AWS API error (retry failed): {error_message}")
-            
             raise ValueError(f"AWS API error: {error_message}")
         except Exception as e:
             logger.error(f"Unexpected error in get_dimension_values: {e}")
             raise ValueError(f"Failed to retrieve dimension values: {str(e)}")
     
-    async def get_account_info(self) -> dict:
-        """Get AWS account information including account ID"""
-        if not self.is_configured():
-            error_msg = self.credential_error or "AWS Cost Explorer client is not properly configured"
-            raise ValueError(error_msg)
-        
+    async def get_account_info(self, credentials: AWSCredentials) -> dict:
+        """Get AWS account information using the provided credentials"""
         try:
-            # Use STS to get account information
-            if hasattr(self.client, '_client_config'):
-                # Create STS client with same credentials as Cost Explorer client
-                if settings.aws_access_key_id and settings.aws_secret_access_key:
-                    session = boto3.Session(
-                        aws_access_key_id=settings.aws_access_key_id,
-                        aws_secret_access_key=settings.aws_secret_access_key,
-                        region_name=settings.aws_region
-                    )
-                    sts_client = session.client('sts')
-                else:
-                    session = boto3.Session(region_name=settings.aws_region)
-                    sts_client = session.client('sts')
-                
-                response = sts_client.get_caller_identity()
-                return {
-                    "account_id": response.get('Account'),
-                    "user_id": response.get('UserId'), 
-                    "arn": response.get('Arn')
-                }
-            else:
-                raise ValueError("Unable to determine account information")
+            # Create STS client to get account information
+            sts_client = self.create_client(credentials, 'sts')
+            response = sts_client.get_caller_identity()
+            
+            return {
+                "account_id": response.get('Account'),
+                "user_id": response.get('UserId'), 
+                "arn": response.get('Arn')
+            }
                 
         except ClientError as e:
             error_message = e.response['Error']['Message']
             logger.error(f"AWS API error getting account info: {e}")
-            
-            # Try to refresh credentials if they're expired
-            if self._refresh_client_if_needed(error_message):
-                try:
-                    # Retry with refreshed credentials
-                    if settings.aws_access_key_id and settings.aws_secret_access_key:
-                        session = boto3.Session(
-                            aws_access_key_id=settings.aws_access_key_id,
-                            aws_secret_access_key=settings.aws_secret_access_key,
-                            region_name=settings.aws_region
-                        )
-                        sts_client = session.client('sts')
-                    else:
-                        session = boto3.Session(region_name=settings.aws_region)
-                        sts_client = session.client('sts')
-                    
-                    response = sts_client.get_caller_identity()
-                    return {
-                        "account_id": response.get('Account'),
-                        "user_id": response.get('UserId'),
-                        "arn": response.get('Arn')
-                    }
-                    
-                except Exception as retry_e:
-                    logger.error(f"Retry after credential refresh failed: {retry_e}")
-                    raise ValueError(f"AWS API error (retry failed): {error_message}")
-            
             raise ValueError(f"AWS API error: {error_message}")
         except Exception as e:
             logger.error(f"Unexpected error getting account info: {e}")
             raise ValueError(f"Failed to retrieve account information: {str(e)}")
 
 
-# Global instance
+# Global instance - now stateless
 cost_explorer_service = AWSCostExplorerService()
