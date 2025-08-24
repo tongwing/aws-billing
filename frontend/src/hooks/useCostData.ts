@@ -1,13 +1,21 @@
 import { useState, useEffect, useCallback } from 'react';
 import { costApi } from '../services/api';
 import { CostDataResponse, FilterState } from '../types/billing';
+import { useCredentials } from '../contexts/CredentialsContext';
 
 export const useCostData = (filters: FilterState) => {
+  const { credentials, hasCredentials } = useCredentials();
   const [data, setData] = useState<CostDataResponse | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   const fetchData = useCallback(async () => {
+    // Don't fetch if no credentials
+    if (!hasCredentials || !credentials) {
+      setError('AWS credentials are required. Please configure your credentials.');
+      return;
+    }
+
     setLoading(true);
     setError(null);
     
@@ -18,7 +26,7 @@ export const useCostData = (filters: FilterState) => {
     });
     
     try {
-      const response = await costApi.getCostData({
+      const response = await costApi.getCostData(credentials, {
         start_date: filters.startDate,
         end_date: filters.endDate,
         granularity: filters.granularity,
@@ -57,6 +65,8 @@ export const useCostData = (filters: FilterState) => {
       setLoading(false);
     }
   }, [
+    credentials,
+    hasCredentials,
     filters.startDate,
     filters.endDate,
     filters.granularity,

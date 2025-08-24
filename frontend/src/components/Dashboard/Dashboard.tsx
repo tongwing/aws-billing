@@ -1,10 +1,11 @@
 import React, { useState } from 'react';
 import { useCostData } from '../../hooks/useCostData';
 import { useAccountInfo } from '../../hooks/useAccountInfo';
+import { useCredentials } from '../../contexts/CredentialsContext';
 import { FilterState } from '../../types/billing';
 import { getDefaultDateRange } from '../../utils/dateHelpers';
 import LoadingSpinner from '../Common/LoadingSpinner';
-import AWSConfigAlert from '../Common/AWSConfigAlert';
+import CredentialsModal from '../Credentials/CredentialsModal';
 import CostChart from './CostChart';
 import FilterPanel from './FilterPanel';
 import SummaryCards from './SummaryCards';
@@ -27,7 +28,9 @@ const Dashboard: React.FC = () => {
     };
   });
   const [activeTab, setActiveTab] = useState<'overview' | 'services'>('overview');
+  const [showCredentialsModal, setShowCredentialsModal] = useState(false);
 
+  const { hasCredentials } = useCredentials();
   const { data, loading, error, refetch } = useCostData(filters);
   const { accountInfo } = useAccountInfo();
 
@@ -40,7 +43,16 @@ const Dashboard: React.FC = () => {
     refetch();
   };
 
-  if (error) {
+  const openCredentialsModal = () => {
+    setShowCredentialsModal(true);
+  };
+
+  const closeCredentialsModal = () => {
+    setShowCredentialsModal(false);
+  };
+
+  // Show error screen for non-credential related errors
+  if (error && !error.includes('AWS credentials')) {
     return (
       <div className="min-h-screen bg-gray-50 flex items-center justify-center">
         <div className="text-center max-w-lg">
@@ -48,25 +60,21 @@ const Dashboard: React.FC = () => {
           <div className="text-gray-600 mb-4 text-left bg-red-50 border border-red-200 rounded-md p-4">
             <p className="font-medium text-red-800 mb-2">Error Details:</p>
             <p className="text-red-700">{error}</p>
-            
-            {error.includes('AWS credentials') && (
-              <div className="mt-4 text-sm">
-                <p className="font-medium text-red-800">Configuration Steps:</p>
-                <ol className="list-decimal list-inside mt-2 space-y-1">
-                  <li>Copy <code className="bg-red-100 px-1 rounded">backend/.env.example</code> to <code className="bg-red-100 px-1 rounded">backend/.env</code></li>
-                  <li>Set your AWS credentials in the <code className="bg-red-100 px-1 rounded">.env</code> file</li>
-                  <li>Restart the backend service</li>
-                  <li>Ensure your credentials have Cost Explorer permissions</li>
-                </ol>
-              </div>
-            )}
           </div>
-          <button
-            onClick={handleRefresh}
-            className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700"
-          >
-            Try Again
-          </button>
+          <div className="space-x-3">
+            <button
+              onClick={handleRefresh}
+              className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700"
+            >
+              Try Again
+            </button>
+            <button
+              onClick={openCredentialsModal}
+              className="px-4 py-2 bg-gray-600 text-white rounded-md hover:bg-gray-700"
+            >
+              Check Credentials
+            </button>
+          </div>
         </div>
       </div>
     );
@@ -77,18 +85,26 @@ const Dashboard: React.FC = () => {
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
         {/* Header */}
         <div className="mb-6">
-          <h1 className="text-3xl font-bold text-gray-900">
-            AWS Billing Dashboard
-            {accountInfo?.account_id && (
-              <span className="ml-3 text-lg font-normal text-gray-600">
-                ({accountInfo.account_id})
-              </span>
-            )}
-          </h1>
+          <div className="flex justify-between items-center">
+            <h1 className="text-3xl font-bold text-gray-900">
+              AWS Billing Dashboard
+              {accountInfo?.account_id && (
+                <span className="ml-3 text-lg font-normal text-gray-600">
+                  ({accountInfo.account_id})
+                </span>
+              )}
+            </h1>
+            <button
+              onClick={openCredentialsModal}
+              className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 flex items-center space-x-2"
+            >
+              <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 7a2 2 0 012 2m0 0a2 2 0 012 2v6a2 2 0 01-2 2H9a2 2 0 01-2-2V9a2 2 0 012-2m0 0V7a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10" />
+              </svg>
+              <span>{hasCredentials ? 'Manage' : 'Configure'} Credentials</span>
+            </button>
+          </div>
         </div>
-
-        {/* AWS Configuration Alert */}
-        <AWSConfigAlert className="mb-6" />
 
         {/* Summary Cards */}
         <div className="mb-6">
@@ -151,13 +167,19 @@ const Dashboard: React.FC = () => {
 
         {/* Loading Overlay */}
         {loading && (
-          <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+          <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-40">
             <div className="bg-white p-6 rounded-lg shadow-lg">
               <LoadingSpinner size="lg" text="Loading cost data..." />
             </div>
           </div>
         )}
       </div>
+
+      {/* Credentials Modal */}
+      <CredentialsModal
+        isOpen={showCredentialsModal}
+        onClose={closeCredentialsModal}
+      />
     </div>
   );
 };
