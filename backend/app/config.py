@@ -1,5 +1,6 @@
 from pydantic_settings import BaseSettings
-from typing import Optional
+from pydantic import field_validator
+from typing import Optional, Union
 import os
 
 
@@ -15,7 +16,15 @@ class Settings(BaseSettings):
     cache_ttl: int = 3600  # 1 hour
     
     # CORS - Allow external access in development
-    allowed_origins: list = ["http://localhost:3000", "http://0.0.0.0:3000", "*"]
+    allowed_origins: Union[str, list] = ["http://localhost:3000", "http://0.0.0.0:3000", "*"]
+    
+    @field_validator('allowed_origins')
+    @classmethod
+    def parse_allowed_origins(cls, v):
+        if isinstance(v, str):
+            # Handle comma-separated string from environment variable
+            return [origin.strip() for origin in v.split(',') if origin.strip()]
+        return v
     
     class Config:
         env_file = ".env"

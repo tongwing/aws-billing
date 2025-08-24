@@ -1,0 +1,57 @@
+version: '3.8'
+
+services:
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: aws-billing-backend
+    ports:
+      - "8000:8000"
+    environment:
+      - PYTHONUNBUFFERED=1
+      - DEBUG=false
+      - DEFAULT_AWS_REGION=us-east-1
+      - ALLOWED_ORIGINS=http://localhost:3000,http://frontend:3000
+    volumes:
+      # Optional: persist any local data (logs, etc.)
+      - backend_data:/app/data
+    networks:
+      - aws-billing-network
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/api/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    container_name: aws-billing-frontend
+    ports:
+      - "3000:3000"
+    environment:
+      - REACT_APP_API_URL=/api
+    depends_on:
+      backend:
+        condition: service_healthy
+    networks:
+      - aws-billing-network
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:3000/"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+
+networks:
+  aws-billing-network:
+    driver: bridge
+
+volumes:
+  backend_data:
+    driver: local
