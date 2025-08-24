@@ -37,7 +37,22 @@ export const useCostData = (filters: FilterState) => {
       
       setData(response);
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to fetch cost data');
+      console.error('Cost data fetch error:', err);
+      let errorMessage = 'Failed to fetch cost data';
+      
+      if (err instanceof Error) {
+        errorMessage = err.message;
+        // Check for AWS credential specific errors
+        if (err.message.includes('AWS credentials not configured')) {
+          errorMessage = 'AWS credentials are not configured. Please set your AWS_ACCESS_KEY_ID and AWS_SECRET_ACCESS_KEY environment variables.';
+        } else if (err.message.includes('Invalid AWS credentials')) {
+          errorMessage = 'Invalid AWS credentials. Please check your AWS_ACCESS_KEY_ID and AWS_SECRET_ACCESS_KEY are correct.';
+        } else if (err.message.includes('AWS configuration error')) {
+          errorMessage = err.message;
+        }
+      }
+      
+      setError(errorMessage);
     } finally {
       setLoading(false);
     }

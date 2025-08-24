@@ -39,6 +39,7 @@ export interface HealthResponse {
   status: string;
   timestamp: string;
   aws_config: boolean;
+  aws_error?: string;
 }
 
 export interface FilterState {

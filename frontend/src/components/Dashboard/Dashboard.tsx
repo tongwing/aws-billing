@@ -4,6 +4,7 @@ import { useAccountInfo } from '../../hooks/useAccountInfo';
 import { FilterState } from '../../types/billing';
 import { getDefaultDateRange } from '../../utils/dateHelpers';
 import LoadingSpinner from '../Common/LoadingSpinner';
+import AWSConfigAlert from '../Common/AWSConfigAlert';
 import CostChart from './CostChart';
 import FilterPanel from './FilterPanel';
 import SummaryCards from './SummaryCards';
@@ -42,9 +43,24 @@ const Dashboard: React.FC = () => {
   if (error) {
     return (
       <div className="min-h-screen bg-gray-50 flex items-center justify-center">
-        <div className="text-center max-w-md">
+        <div className="text-center max-w-lg">
           <div className="text-red-600 text-xl mb-2">⚠️ Error Loading Data</div>
-          <div className="text-gray-600 mb-4">{error}</div>
+          <div className="text-gray-600 mb-4 text-left bg-red-50 border border-red-200 rounded-md p-4">
+            <p className="font-medium text-red-800 mb-2">Error Details:</p>
+            <p className="text-red-700">{error}</p>
+            
+            {error.includes('AWS credentials') && (
+              <div className="mt-4 text-sm">
+                <p className="font-medium text-red-800">Configuration Steps:</p>
+                <ol className="list-decimal list-inside mt-2 space-y-1">
+                  <li>Copy <code className="bg-red-100 px-1 rounded">backend/.env.example</code> to <code className="bg-red-100 px-1 rounded">backend/.env</code></li>
+                  <li>Set your AWS credentials in the <code className="bg-red-100 px-1 rounded">.env</code> file</li>
+                  <li>Restart the backend service</li>
+                  <li>Ensure your credentials have Cost Explorer permissions</li>
+                </ol>
+              </div>
+            )}
+          </div>
           <button
             onClick={handleRefresh}
             className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700"
@@ -69,8 +85,10 @@ const Dashboard: React.FC = () => {
               </span>
             )}
           </h1>
-          <p className="mt-2 text-gray-600">Monitor your AWS costs and usage with real-time insights</p>
         </div>
+
+        {/* AWS Configuration Alert */}
+        <AWSConfigAlert className="mb-6" />
 
         {/* Summary Cards */}
         <div className="mb-6">

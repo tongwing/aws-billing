@@ -12,6 +12,7 @@ logger = logging.getLogger(__name__)
 class AWSCostExplorerService:
     def __init__(self):
         self.client = None
+        self.credential_error = None
         self._initialize_client()
     
     def _initialize_client(self):
@@ -24,13 +25,24 @@ class AWSCostExplorerService:
                     region_name=settings.aws_region
                 )
                 self.client = session.client('ce')
+        except NoCredentialsError as e:
+            logger.error(f"AWS credentials not found: {e}")
+            self.client = None
+            self.credential_error = "AWS credentials not configured. Please set AWS_ACCESS_KEY_ID and AWS_SECRET_ACCESS_KEY environment variables or configure AWS credentials."
+        except ClientError as e:
+            error_code = e.response.get('Error', {}).get('Code', 'Unknown')
+            if error_code in ['InvalidUserID.NotFound', 'SignatureDoesNotMatch', 'InvalidAccessKeyId']:
+                logger.error(f"Invalid AWS credentials: {e}")
+                self.client = None
+                self.credential_error = "Invalid AWS credentials. Please check your AWS_ACCESS_KEY_ID and AWS_SECRET_ACCESS_KEY."
             else:
-                # Try to use default credentials (IAM role, profile, etc.)
-                session = boto3.Session(region_name=settings.aws_region)
-                self.client = session.client('ce')
+                logger.error(f"AWS API error during initialization: {e}")
+                self.client = None
+                self.credential_error = f"AWS configuration error: {e.response.get('Error', {}).get('Message', str(e))}"
         except Exception as e:
             logger.error(f"Failed to initialize AWS Cost Explorer client: {e}")
             self.client = None
+            self.credential_error = f"AWS client initialization failed: {str(e)}"
     
     def _refresh_client_if_needed(self, error_message: str) -> bool:
         """Refresh the client if credentials are expired"""
@@ -70,7 +82,8 @@ class AWSCostExplorerService:
     
     async def get_cost_and_usage(self, request: CostDataRequest) -> CostDataResponse:
         if not self.is_configured():
-            raise ValueError("AWS Cost Explorer client is not properly configured")
+            error_msg = self.credential_error or "AWS Cost Explorer client is not properly configured"
+            raise ValueError(error_msg)
         
         try:
             # Prepare the request for AWS API
@@ -209,7 +222,8 @@ class AWSCostExplorerService:
     
     async def get_dimension_values(self, dimension: str, time_period: TimePeriod) -> List[str]:
         if not self.is_configured():
-            raise ValueError("AWS Cost Explorer client is not properly configured")
+            error_msg = self.credential_error or "AWS Cost Explorer client is not properly configured"
+            raise ValueError(error_msg)
         
         try:
             response = self.client.get_dimension_values(
@@ -251,7 +265,8 @@ class AWSCostExplorerService:
     async def get_account_info(self) -> dict:
         """Get AWS account information including account ID"""
         if not self.is_configured():
-            raise ValueError("AWS Cost Explorer client is not properly configured")
+            error_msg = self.credential_error or "AWS Cost Explorer client is not properly configured"
+            raise ValueError(error_msg)
         
         try:
             # Use STS to get account information

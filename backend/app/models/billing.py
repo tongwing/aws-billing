@@ -52,3 +52,4 @@ class HealthResponse(BaseModel):
     status: str
     timestamp: datetime
     aws_config: bool
+    aws_error: Optional[str] = None
