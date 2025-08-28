@@ -51,9 +51,8 @@ const Dashboard: React.FC = () => {
     setShowCredentialsModal(false);
   };
 
-  // Check if error is credential-related
+  // Check if error is credential-related (but exclude initial loading message)
   const isCredentialError = error && (
-    error.includes('AWS credentials') ||
     error.includes('Invalid or expired AWS credentials') ||
     error.includes('AWS API error') ||
     error.includes('InvalidAccessKeyId') ||
@@ -62,15 +61,25 @@ const Dashboard: React.FC = () => {
     error.includes('AccessDenied')
   );
 
-  // Auto-show credentials modal for credential errors
+  // Check if error is the generic "credentials required" message (don't auto-show modal for this)
+  const isGenericCredentialsMessage = error && error.includes('AWS credentials are required');
+
+  // Auto-show credentials modal for credential errors (with debounce to avoid race conditions)
   React.useEffect(() => {
-    if (isCredentialError && !showCredentialsModal) {
-      setShowCredentialsModal(true);
+    if (isCredentialError && !showCredentialsModal && hasCredentials) {
+      // Add a small delay to avoid race conditions during initial load
+      const timer = setTimeout(() => {
+        if (isCredentialError && !showCredentialsModal) {
+          setShowCredentialsModal(true);
+        }
+      }, 500);
+      
+      return () => clearTimeout(timer);
     }
-  }, [isCredentialError, showCredentialsModal]);
+  }, [isCredentialError, showCredentialsModal, hasCredentials]);
 
   // Show error screen for non-credential related errors
-  if (error && !isCredentialError) {
+  if (error && !isCredentialError && !isGenericCredentialsMessage) {
     return (
       <div className="min-h-screen bg-gray-50 flex items-center justify-center">
         <div className="text-center max-w-lg">
@@ -197,10 +206,16 @@ const Dashboard: React.FC = () => {
       <CredentialsModal
         isOpen={showCredentialsModal}
         onClose={closeCredentialsModal}
-        title={isCredentialError ? "AWS Credentials Issue Detected" : "Manage AWS Credentials"}
+        title={
+          isCredentialError ? "AWS Credentials Issue Detected" : 
+          isGenericCredentialsMessage ? "AWS Credentials Required" : 
+          "Manage AWS Credentials"
+        }
         description={
           isCredentialError 
             ? "Your AWS credentials appear to be invalid or expired. Please update them to continue accessing your billing data."
+            : isGenericCredentialsMessage
+            ? "Please configure your AWS credentials to access billing data for your account."
             : "Configure your AWS credentials to access billing data for your account."
         }
       />

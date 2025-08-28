@@ -8,11 +8,19 @@ export const useCostData = (filters: FilterState) => {
   const [data, setData] = useState<CostDataResponse | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [isInitialized, setIsInitialized] = useState(false);
 
   const fetchData = useCallback(async () => {
-    // Don't fetch if no credentials
+    // Mark as initialized after first check
+    if (!isInitialized) {
+      setIsInitialized(true);
+    }
+
+    // Don't fetch if no credentials, but only set error after initial load
     if (!hasCredentials || !credentials) {
-      setError('AWS credentials are required. Please configure your credentials.');
+      if (isInitialized) {
+        setError('AWS credentials are required. Please configure your credentials.');
+      }
       return;
     }
 
@@ -66,6 +74,7 @@ export const useCostData = (filters: FilterState) => {
   }, [
     credentials,
     hasCredentials,
+    isInitialized,
     filters.startDate,
     filters.endDate,
     filters.granularity,
