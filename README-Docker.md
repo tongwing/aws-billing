@@ -76,20 +76,37 @@ ALLOWED_ORIGINS=http://localhost:3000
 # Frontend settings  
 REACT_APP_API_URL=/api
 
-# Port configuration
+# Development ports (docker-compose.yml)
 BACKEND_PORT=8000
 FRONTEND_PORT=3000
-PROD_FRONTEND_PORT=80
+
+# Production ports (docker-compose.prod.yml)  
+# BACKEND_PORT=8000
+# FRONTEND_PORT=80
 ```
 
 ### Custom Ports
 
-To use different ports, update the docker-compose files or set environment variables:
+The application ports are now fully configurable via environment variables:
 
 ```bash
-# Use custom ports
+# Method 1: Set environment variables directly
+export BACKEND_PORT=9000
+export FRONTEND_PORT=4000
+docker-compose up
+
+# Method 2: Inline environment variables
 BACKEND_PORT=9000 FRONTEND_PORT=4000 docker-compose up
+
+# Method 3: Update your .env file
+echo "BACKEND_PORT=9000" >> .env
+echo "FRONTEND_PORT=4000" >> .env
+docker-compose up
 ```
+
+**Default ports:**
+- Development: Backend=8000, Frontend=3000
+- Production: Backend=8000, Frontend=80
 
 ## Architecture
 
@@ -203,7 +220,12 @@ lsof -i :3000
 lsof -i :8000
 
 # Use different ports
-FRONTEND_PORT=4000 docker-compose up
+BACKEND_PORT=9000 FRONTEND_PORT=4000 docker-compose up
+
+# Or update your .env file
+echo "BACKEND_PORT=9000" >> .env  
+echo "FRONTEND_PORT=4000" >> .env
+docker-compose up
 ```
 
 **2. Build Failures**
