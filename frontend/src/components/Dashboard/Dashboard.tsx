@@ -1,9 +1,11 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useCostData } from '../../hooks/useCostData';
 import { useAccountInfo } from '../../hooks/useAccountInfo';
 import { useCredentials } from '../../contexts/CredentialsContext';
 import { FilterState } from '../../types/billing';
 import { getDefaultDateRange } from '../../utils/dateHelpers';
+import { parseCurrentUrlParams, updateUrlWithFilters } from '../../utils/urlParams';
+import { useUrlState } from '../../hooks/useUrlState';
 import LoadingSpinner from '../Common/LoadingSpinner';
 import CredentialsModal from '../Credentials/CredentialsModal';
 import CostChart from './CostChart';
@@ -12,35 +14,86 @@ import SummaryCards from './SummaryCards';
 import ServiceBreakdown from './ServiceBreakdown';
 
 const Dashboard: React.FC = () => {
+  // Initialize state from URL parameters
   const [filters, setFilters] = useState<FilterState>(() => {
-    const defaultRange = getDefaultDateRange(30);
-    return {
-      startDate: defaultRange.start,
-      endDate: defaultRange.end,
-      granularity: 'DAILY',
-      metrics: ['BlendedCost'],
-      includeSupport: true,
-      includeOtherSubscription: true,
-      includeUpfront: true,
-      includeRefund: true,
-      includeCredit: false,
-      includeRiFee: true,
-    };
+    try {
+      const { filters: urlFilters } = parseCurrentUrlParams();
+      return urlFilters;
+    } catch (error) {
+      console.warn('Failed to parse URL parameters, using defaults:', error);
+      const defaultRange = getDefaultDateRange(30);
+      return {
+        startDate: defaultRange.start,
+        endDate: defaultRange.end,
+        granularity: 'DAILY',
+        metrics: ['BlendedCost'],
+        includeSupport: true,
+        includeOtherSubscription: true,
+        includeUpfront: true,
+        includeRefund: true,
+        includeCredit: false,
+        includeRiFee: true,
+      };
+    }
   });
-  const [activeTab, setActiveTab] = useState<'overview' | 'services'>('overview');
+
+  const [activeTab, setActiveTab] = useState<'overview' | 'services'>(() => {
+    try {
+      const { activeTab: urlTab } = parseCurrentUrlParams();
+      return (urlTab as 'overview' | 'services') || 'overview';
+    } catch (error) {
+      return 'overview';
+    }
+  });
   const [showCredentialsModal, setShowCredentialsModal] = useState(false);
+  const [urlCopied, setUrlCopied] = useState(false);
 
   const { hasCredentials } = useCredentials();
   const { data, loading, error, refetch } = useCostData(filters);
   const { accountInfo } = useAccountInfo();
+  const { copyCurrentUrl } = useUrlState();
 
   const handleFiltersChange = (newFilters: FilterState) => {
     console.log('Dashboard receiving new filters:', newFilters);
     setFilters(newFilters);
   };
 
+  const handleTabChange = (tab: 'overview' | 'services') => {
+    setActiveTab(tab);
+  };
+
+  // Sync filters and activeTab to URL whenever they change
+  useEffect(() => {
+    updateUrlWithFilters(filters, activeTab);
+  }, [filters, activeTab]);
+
+  // Handle browser back/forward navigation
+  useEffect(() => {
+    const handlePopState = () => {
+      try {
+        const { filters: urlFilters, activeTab: urlTab } = parseCurrentUrlParams();
+        setFilters(urlFilters);
+        setActiveTab(urlTab as 'overview' | 'services');
+      } catch (error) {
+        console.warn('Failed to parse URL parameters on navigation:', error);
+      }
+    };
+
+    window.addEventListener('popstate', handlePopState);
+    return () => window.removeEventListener('popstate', handlePopState);
+  }, []);
+
   const handleRefresh = () => {
     refetch();
+  };
+
+  const handleCopyUrl = async () => {
+    const success = await copyCurrentUrl();
+    if (success) {
+      setUrlCopied(true);
+      // Reset the "copied" state after 2 seconds
+      setTimeout(() => setUrlCopied(false), 2000);
+    }
   };
 
   const openCredentialsModal = () => {
@@ -121,15 +174,27 @@ const Dashboard: React.FC = () => {
                 </span>
               )}
             </h1>
-            <button
-              onClick={openCredentialsModal}
-              className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 flex items-center space-x-2"
-            >
-              <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 7a2 2 0 012 2m0 0a2 2 0 012 2v6a2 2 0 01-2 2H9a2 2 0 01-2-2V9a2 2 0 012-2m0 0V7a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10" />
-              </svg>
-              <span>{hasCredentials ? 'Manage' : 'Configure'} Credentials</span>
-            </button>
+            <div className="flex items-center space-x-3">
+              <button
+                onClick={handleCopyUrl}
+                className="px-3 py-2 bg-gray-100 text-gray-700 rounded-md hover:bg-gray-200 focus:outline-none focus:ring-2 focus:ring-gray-500 flex items-center space-x-2 text-sm"
+                title="Copy current URL with filters"
+              >
+                <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z" />
+                </svg>
+                <span>{urlCopied ? 'Copied!' : 'Copy URL'}</span>
+              </button>
+              <button
+                onClick={openCredentialsModal}
+                className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 flex items-center space-x-2"
+              >
+                <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 7a2 2 0 012 2m0 0a2 2 0 012 2v6a2 2 0 01-2 2H9a2 2 0 01-2-2V9a2 2 0 012-2m0 0V7a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10" />
+                </svg>
+                <span>{hasCredentials ? 'Manage' : 'Configure'} Credentials</span>
+              </button>
+            </div>
           </div>
         </div>
 
@@ -142,7 +207,7 @@ const Dashboard: React.FC = () => {
         <div className="mb-6">
           <nav className="flex space-x-8">
             <button
-              onClick={() => setActiveTab('overview')}
+              onClick={() => handleTabChange('overview')}
               className={`py-2 px-1 border-b-2 font-medium text-sm ${
                 activeTab === 'overview'
                   ? 'border-blue-500 text-blue-600'
@@ -152,7 +217,7 @@ const Dashboard: React.FC = () => {
               📊 Overview
             </button>
             <button
-              onClick={() => setActiveTab('services')}
+              onClick={() => handleTabChange('services')}
               className={`py-2 px-1 border-b-2 font-medium text-sm ${
                 activeTab === 'services'
                   ? 'border-blue-500 text-blue-600'
