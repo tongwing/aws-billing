@@ -51,8 +51,26 @@ const Dashboard: React.FC = () => {
     setShowCredentialsModal(false);
   };
 
+  // Check if error is credential-related
+  const isCredentialError = error && (
+    error.includes('AWS credentials') ||
+    error.includes('Invalid or expired AWS credentials') ||
+    error.includes('AWS API error') ||
+    error.includes('InvalidAccessKeyId') ||
+    error.includes('SignatureDoesNotMatch') ||
+    error.includes('TokenRefreshRequired') ||
+    error.includes('AccessDenied')
+  );
+
+  // Auto-show credentials modal for credential errors
+  React.useEffect(() => {
+    if (isCredentialError && !showCredentialsModal) {
+      setShowCredentialsModal(true);
+    }
+  }, [isCredentialError, showCredentialsModal]);
+
   // Show error screen for non-credential related errors
-  if (error && !error.includes('AWS credentials')) {
+  if (error && !isCredentialError) {
     return (
       <div className="min-h-screen bg-gray-50 flex items-center justify-center">
         <div className="text-center max-w-lg">
@@ -179,6 +197,12 @@ const Dashboard: React.FC = () => {
       <CredentialsModal
         isOpen={showCredentialsModal}
         onClose={closeCredentialsModal}
+        title={isCredentialError ? "AWS Credentials Issue Detected" : "Manage AWS Credentials"}
+        description={
+          isCredentialError 
+            ? "Your AWS credentials appear to be invalid or expired. Please update them to continue accessing your billing data."
+            : "Configure your AWS credentials to access billing data for your account."
+        }
       />
     </div>
   );

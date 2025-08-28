@@ -28,9 +28,20 @@ export const useAccountInfo = () => {
       try {
         const info = await costApi.getAccountInfo(credentials);
         setAccountInfo(info);
-      } catch (err) {
-        setError(err instanceof Error ? err.message : 'Failed to fetch account info');
+      } catch (err: any) {
         console.warn('Failed to fetch account info:', err);
+        let errorMessage = 'Failed to fetch account info';
+        
+        // Extract error message from axios response
+        if (err.response?.data?.detail) {
+          errorMessage = err.response.data.detail;
+        } else if (err.response?.status === 400) {
+          errorMessage = 'Invalid or expired AWS credentials. Please update your credentials.';
+        } else if (err instanceof Error) {
+          errorMessage = err.message;
+        }
+        
+        setError(errorMessage);
       } finally {
         setLoading(false);
       }

@@ -44,20 +44,19 @@ export const useCostData = (filters: FilterState) => {
       });
       
       setData(response);
-    } catch (err) {
+    } catch (err: any) {
       console.error('Cost data fetch error:', err);
       let errorMessage = 'Failed to fetch cost data';
       
-      if (err instanceof Error) {
+      // Extract error message from axios response
+      if (err.response?.data?.detail) {
+        // Backend sends error details in the 'detail' field
+        errorMessage = err.response.data.detail;
+      } else if (err.response?.status === 400) {
+        // Generic 400 error - likely credential issue
+        errorMessage = 'Invalid or expired AWS credentials. Please update your credentials.';
+      } else if (err instanceof Error) {
         errorMessage = err.message;
-        // Check for AWS credential specific errors
-        if (err.message.includes('AWS credentials not configured')) {
-          errorMessage = 'AWS credentials are not configured. Please set your AWS_ACCESS_KEY_ID and AWS_SECRET_ACCESS_KEY environment variables.';
-        } else if (err.message.includes('Invalid AWS credentials')) {
-          errorMessage = 'Invalid AWS credentials. Please check your AWS_ACCESS_KEY_ID and AWS_SECRET_ACCESS_KEY are correct.';
-        } else if (err.message.includes('AWS configuration error')) {
-          errorMessage = err.message;
-        }
       }
       
       setError(errorMessage);
