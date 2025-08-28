@@ -24,14 +24,9 @@ else
 fi
 
 # Set environment variables for the React app
-# Auto-detect external IP for API URL if not set
+# Use relative path to leverage the proxy in package.json
 if [ -z "$REACT_APP_API_URL" ]; then
-    EXTERNAL_IP=$(curl -s ifconfig.me 2>/dev/null)
-    if [ -n "$EXTERNAL_IP" ]; then
-        export REACT_APP_API_URL=http://$EXTERNAL_IP:8000/api
-    else
-        export REACT_APP_API_URL=http://localhost:8000/api
-    fi
+    export REACT_APP_API_URL=/api
 fi
 export BROWSER=none  # Prevent automatic browser opening
 export HOST=0.0.0.0  # Bind to all interfaces for external access
