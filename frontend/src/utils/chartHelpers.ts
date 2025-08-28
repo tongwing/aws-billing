@@ -40,17 +40,24 @@ export const processChartData = (data: CostDataResponse) => {
 
   // If grouping is enabled
   if (data.group_by && data.group_by.length > 0 && data.results[0].groups.length > 0) {
-    // Get all unique group keys
-    const allKeys = new Set<string>();
+    // Get all unique group keys and calculate total cost for each
+    const groupTotals = new Map<string, number>();
     data.results.forEach(result => {
       result.groups.forEach(group => {
         if (group.keys.length > 0) {
-          allKeys.add(group.keys[0]);
+          const key = group.keys[0];
+          const cost = group.metrics.BlendedCost ? parseFloat(group.metrics.BlendedCost.amount) : 0;
+          groupTotals.set(key, (groupTotals.get(key) || 0) + cost);
         }
       });
     });
 
-    const sortedKeys = Array.from(allKeys).sort();
+    // Sort by total cost (descending) and limit to top 10
+    const sortedKeys = Array.from(groupTotals.entries())
+      .sort(([, a], [, b]) => b - a)
+      .slice(0, 10)
+      .map(([key]) => key);
+    
     const colors = generateColors(sortedKeys.length);
 
     const datasets = sortedKeys.map((key, index) => {

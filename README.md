@@ -2,6 +2,10 @@
 
 A real-time AWS billing dashboard web application that tracks cloud usage and costs with comprehensive filtering and grouping capabilities.
 
+![AWS Billing Dashboard Screenshot](screenshot.png)
+
+I built this app because I was tired of constantly going into the AWS console just to check billing information. As the commit messages show, the entire project was generated using Claude Code. I’m using this as a way to explore Claude Code and learn how to use it more effectively.
+
 ## Features
 - ✅ User-configurable AWS credentials (no server-side .env required)
 - ✅ Stateless backend supporting multiple users
@@ -75,12 +79,6 @@ Ensure your AWS credentials have the following permissions:
 1. **Backend health check:** http://localhost:8000/api/health
 2. **API documentation:** http://localhost:8000/docs  
 3. **Frontend application:** http://localhost:3000
-
-### External Access (Optional)
-Use the convenience script for external server access:
-```bash
-./start-external.sh [YOUR_PUBLIC_IP]
-```
 
 ## API Reference
 

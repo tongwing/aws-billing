@@ -111,7 +111,7 @@ const CostChart: React.FC<CostChartProps> = ({ data, loading }) => {
       </div>
 
       {/* Chart Container */}
-      <div className="h-96 bg-white p-4 rounded-lg border">
+      <div className="h-[32rem] bg-white p-4 rounded-lg border">
         {chartType === 'bar' ? (
           <Bar 
             key={`${data?.time_period.start}-${data?.time_period.end}-${chartType}`}

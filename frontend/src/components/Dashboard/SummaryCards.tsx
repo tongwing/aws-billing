@@ -114,8 +114,10 @@ const SummaryCards: React.FC<SummaryCardsProps> = ({ data, loading }) => {
             <div className="text-sm font-medium opacity-80">{card.title}</div>
             <div className="text-lg">{card.icon}</div>
           </div>
-          <div className="text-xl font-bold mb-1">{card.value}</div>
-          <div className="text-xs opacity-70">{card.subtitle}</div>
+          <div className="flex items-center justify-between">
+            <div className="text-xl font-bold">{card.value}</div>
+            <div className="text-xs opacity-70">{card.subtitle}</div>
+          </div>
         </div>
       ))}
     </div>
