@@ -5,9 +5,10 @@ import { formatCurrency } from '../../utils/dateHelpers';
 interface SummaryCardsProps {
   data: CostDataResponse | null;
   loading?: boolean;
+  visibleDatasets?: string[];
 }
 
-const SummaryCards: React.FC<SummaryCardsProps> = ({ data, loading }) => {
+const SummaryCards: React.FC<SummaryCardsProps> = ({ data, loading, visibleDatasets = [] }) => {
   if (loading) {
     return (
       <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
@@ -31,12 +32,30 @@ const SummaryCards: React.FC<SummaryCardsProps> = ({ data, loading }) => {
     );
   }
 
-  // Calculate metrics
-  const totalCost = data.results.reduce((sum, result) => {
-    if (result.total?.BlendedCost) {
-      return sum + parseFloat(result.total.BlendedCost.amount);
+  // Helper function to filter groups based on visible datasets
+  const isGroupVisible = (group: any) => {
+    // If no datasets are specified (initial load), show all data
+    if (visibleDatasets.length === 0) return true;
+    
+    // If we have group data, check if this group's key is in visible datasets
+    if (group.keys && group.keys.length > 0) {
+      return visibleDatasets.includes(group.keys[0]);
     }
+    
+    return true;
+  };
+
+  // Calculate metrics with dataset visibility filtering
+  const totalCost = data.results.reduce((sum, result) => {
+    // For ungrouped data (total cost only), check if "Total Cost" dataset is visible
+    if (result.total?.BlendedCost) {
+      const shouldInclude = visibleDatasets.length === 0 || visibleDatasets.includes('Total Cost');
+      return shouldInclude ? sum + parseFloat(result.total.BlendedCost.amount) : sum;
+    }
+    
+    // For grouped data, only include visible groups
     return sum + result.groups.reduce((groupSum, group) => {
+      if (!isGroupVisible(group)) return groupSum;
       return groupSum + (group.metrics.BlendedCost ? parseFloat(group.metrics.BlendedCost.amount) : 0);
     }, 0);
   }, 0);
@@ -44,28 +63,41 @@ const SummaryCards: React.FC<SummaryCardsProps> = ({ data, loading }) => {
   const dailyAverage = totalCost / data.results.length;
   
   const costs = data.results.map(result => {
+    // For ungrouped data (total cost only), check if "Total Cost" dataset is visible
     if (result.total?.BlendedCost) {
-      return parseFloat(result.total.BlendedCost.amount);
+      const shouldInclude = visibleDatasets.length === 0 || visibleDatasets.includes('Total Cost');
+      return shouldInclude ? parseFloat(result.total.BlendedCost.amount) : 0;
     }
+    
+    // For grouped data, only include visible groups
     return result.groups.reduce((sum, group) => {
+      if (!isGroupVisible(group)) return sum;
       return sum + (group.metrics.BlendedCost ? parseFloat(group.metrics.BlendedCost.amount) : 0);
     }, 0);
   });
 
-  const maxCost = Math.max(...costs);
-  const minCost = Math.min(...costs);
+  // Handle edge case where all costs might be zero (all datasets hidden)
+  const validCosts = costs.filter(cost => cost > 0);
+  const maxCost = validCosts.length > 0 ? Math.max(...validCosts) : 0;
+  const minCost = validCosts.length > 0 ? Math.min(...validCosts) : 0;
   
   // Calculate trend (compare first half vs second half of period)
   const midPoint = Math.floor(costs.length / 2);
   const firstHalfAvg = costs.slice(0, midPoint).reduce((sum, cost) => sum + cost, 0) / midPoint;
   const secondHalfAvg = costs.slice(midPoint).reduce((sum, cost) => sum + cost, 0) / (costs.length - midPoint);
-  const trendPercent = ((secondHalfAvg - firstHalfAvg) / firstHalfAvg) * 100;
+  const trendPercent = firstHalfAvg > 0 ? ((secondHalfAvg - firstHalfAvg) / firstHalfAvg) * 100 : 0;
+
+  // Check if we're showing filtered data
+  const isFiltered = visibleDatasets.length > 0;
+  const hasGroupedData = data.group_by && data.group_by.length > 0;
 
   const cards = [
     {
-      title: 'Total Cost',
+      title: isFiltered && hasGroupedData ? 'Filtered Total' : 'Total Cost',
       value: formatCurrency(totalCost.toString()),
-      subtitle: `${data.results.length} ${data.granularity.toLowerCase()} periods`,
+      subtitle: isFiltered && hasGroupedData 
+        ? `${visibleDatasets.length} visible datasets` 
+        : `${data.results.length} ${data.granularity.toLowerCase()} periods`,
       icon: '💰',
       color: 'blue',
     },

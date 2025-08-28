@@ -47,6 +47,7 @@ const Dashboard: React.FC = () => {
   });
   const [showCredentialsModal, setShowCredentialsModal] = useState(false);
   const [urlCopied, setUrlCopied] = useState(false);
+  const [visibleDatasets, setVisibleDatasets] = useState<string[]>([]);
 
   const { hasCredentials } = useCredentials();
   const { data, loading, error, refetch } = useCostData(filters);
@@ -94,6 +95,10 @@ const Dashboard: React.FC = () => {
       // Reset the "copied" state after 2 seconds
       setTimeout(() => setUrlCopied(false), 2000);
     }
+  };
+
+  const handleDatasetVisibilityChange = (visible: string[]) => {
+    setVisibleDatasets(visible);
   };
 
   const openCredentialsModal = () => {
@@ -200,7 +205,7 @@ const Dashboard: React.FC = () => {
 
         {/* Summary Cards */}
         <div className="mb-6">
-          <SummaryCards data={data} loading={loading} />
+          <SummaryCards data={data} loading={loading} visibleDatasets={visibleDatasets} />
         </div>
 
         {/* Tabs Navigation */}
@@ -236,7 +241,11 @@ const Dashboard: React.FC = () => {
             {activeTab === 'overview' && (
               <div className="bg-white rounded-lg shadow-sm border">
                 <div className="p-6">
-                  <CostChart data={data} loading={loading} />
+                  <CostChart 
+                    data={data} 
+                    loading={loading} 
+                    onDatasetVisibilityChange={handleDatasetVisibilityChange}
+                  />
                 </div>
               </div>
             )}

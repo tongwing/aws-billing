@@ -32,10 +32,12 @@ ChartJS.register(
 interface CostChartProps {
   data: CostDataResponse | null;
   loading?: boolean;
+  onDatasetVisibilityChange?: (visibleDatasets: string[]) => void;
 }
 
-const CostChart: React.FC<CostChartProps> = ({ data, loading }) => {
+const CostChart: React.FC<CostChartProps> = ({ data, loading, onDatasetVisibilityChange }) => {
   const [chartType, setChartType] = useState<'bar' | 'line'>('bar');
+  const [hiddenDatasets, setHiddenDatasets] = useState<Set<string>>(new Set());
 
   const chartData = useMemo(() => {
     if (!data) return { labels: [], datasets: [] };
@@ -47,10 +49,57 @@ const CostChart: React.FC<CostChartProps> = ({ data, loading }) => {
     return processChartData(data);
   }, [data]);
 
+  // Reset hidden datasets when data changes (e.g., filter changes)
+  React.useEffect(() => {
+    setHiddenDatasets(new Set());
+  }, [data]);
+
+  // Notify parent when visible datasets change
+  React.useEffect(() => {
+    if (onDatasetVisibilityChange && chartData.datasets.length > 0) {
+      const visibleDatasets = chartData.datasets
+        .filter(dataset => !hiddenDatasets.has(dataset.label))
+        .map(dataset => dataset.label);
+      onDatasetVisibilityChange(visibleDatasets);
+    }
+  }, [hiddenDatasets, chartData.datasets, onDatasetVisibilityChange]);
+
   const chartOptions = useMemo(() => {
     const hasGrouping = data?.group_by && data.group_by.length > 0;
-    return getChartOptions(chartType, hasGrouping);
-  }, [chartType, data?.group_by]);
+    const baseOptions = getChartOptions(chartType, hasGrouping);
+    
+    // Add custom legend click handler
+    const customOptions = {
+      ...baseOptions,
+      plugins: {
+        ...baseOptions.plugins,
+        legend: {
+          ...baseOptions.plugins.legend,
+          onClick: (event: any, legendItem: any, legend: any) => {
+            const datasetLabel = legendItem.text;
+            const newHiddenDatasets = new Set(hiddenDatasets);
+            
+            if (hiddenDatasets.has(datasetLabel)) {
+              newHiddenDatasets.delete(datasetLabel);
+            } else {
+              newHiddenDatasets.add(datasetLabel);
+            }
+            
+            setHiddenDatasets(newHiddenDatasets);
+            
+            // Still call the default Chart.js legend click behavior
+            const chart = legend.chart;
+            const index = legendItem.datasetIndex;
+            const meta = chart.getDatasetMeta(index);
+            meta.hidden = meta.hidden === null ? !chart.data.datasets[index].hidden : null;
+            chart.update();
+          }
+        }
+      }
+    };
+    
+    return customOptions;
+  }, [chartType, data?.group_by, hiddenDatasets]);
 
   if (loading) {
     return (
