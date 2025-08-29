@@ -10,9 +10,10 @@ services:
       - "${BACKEND_PORT:-8000}:8000"
     environment:
       - PYTHONUNBUFFERED=1
-      - DEBUG=false
+      - DEBUG=true
       - DEFAULT_AWS_REGION=us-east-1
-      - ALLOWED_ORIGINS=http://localhost:3000,http://frontend:3000
+      - ALLOWED_ORIGINS=*
+      - API_BASE_PATH=${REACT_APP_BASE_PATH:-}
     volumes:
       # Optional: persist any local data (logs, etc.)
       - backend_data:/app/data
@@ -30,11 +31,16 @@ services:
     build:
       context: ./frontend
       dockerfile: Dockerfile
+      args:
+        - REACT_APP_BASE_PATH=${REACT_APP_BASE_PATH:-}
+        - PUBLIC_URL=${REACT_APP_BASE_PATH:-}
     container_name: aws-billing-frontend
     ports:
       - "${FRONTEND_PORT:-3000}:3000"
     environment:
       - REACT_APP_API_URL=/api
+      - REACT_APP_BASE_PATH=${REACT_APP_BASE_PATH:-}
+      - PUBLIC_URL=${REACT_APP_BASE_PATH:-}
     depends_on:
       backend:
         condition: service_healthy

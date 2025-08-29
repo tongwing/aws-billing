@@ -19,9 +19,17 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# Include routers
-app.include_router(health.router, prefix="/api")
-app.include_router(cost_data.router, prefix="/api")
+# Include routers - support both root and sub-path API endpoints
+api_prefix = "/api"
+sub_path_api_prefix = f"{settings.api_base_path}/api" if settings.api_base_path else None
+
+app.include_router(health.router, prefix=api_prefix)
+app.include_router(cost_data.router, prefix=api_prefix)
+
+# If sub-path is configured, also include routers with sub-path prefix
+if sub_path_api_prefix and sub_path_api_prefix != api_prefix:
+    app.include_router(health.router, prefix=sub_path_api_prefix)
+    app.include_router(cost_data.router, prefix=sub_path_api_prefix)
 
 
 @app.get("/")

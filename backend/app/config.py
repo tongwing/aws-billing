@@ -8,6 +8,9 @@ class Settings(BaseSettings):
     app_name: str = "AWS Billing Dashboard"
     debug: bool = False
     
+    # API base path configuration (for sub-path support)
+    api_base_path: str = ""
+    
     # Default AWS region (used as fallback)
     default_aws_region: str = "us-east-1"
     
