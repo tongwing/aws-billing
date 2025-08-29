@@ -14,6 +14,14 @@ RUN npm ci --only=production
 # Copy source code
 COPY . .
 
+# Accept build arguments for React environment variables
+ARG REACT_APP_BASE_PATH
+ARG PUBLIC_URL
+
+# Set environment variables for build
+ENV REACT_APP_BASE_PATH=${REACT_APP_BASE_PATH}
+ENV PUBLIC_URL=${PUBLIC_URL}
+
 # Build the application
 RUN npm run build
 
@@ -23,8 +31,10 @@ FROM nginx:alpine
 # Copy built app from builder stage
 COPY --from=builder /app/build /usr/share/nginx/html
 
-# Copy nginx configuration
-COPY nginx.conf /etc/nginx/conf.d/default.conf
+# Copy nginx configuration template and entrypoint script
+COPY nginx.conf.template /etc/nginx/conf.d/default.conf.template
+COPY entrypoint.sh /entrypoint.sh
+RUN chmod +x /entrypoint.sh
 
 # Create a non-root user
 RUN addgroup -g 1001 -S appgroup && \
@@ -48,5 +58,5 @@ EXPOSE 3000
 HEALTHCHECK --interval=30s --timeout=10s --start-period=5s --retries=3 \
     CMD wget --no-verbose --tries=1 --spider http://localhost:3000/ || exit 1
 
-# Start nginx
-CMD ["nginx", "-g", "daemon off;"]
+# Start with entrypoint script
+CMD ["/entrypoint.sh"]

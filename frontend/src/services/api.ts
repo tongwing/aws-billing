@@ -2,7 +2,10 @@ import axios from 'axios';
 import { CostDataResponse, HealthResponse } from '../types/billing';
 import { AWSCredentials } from './credentials';
 
-const API_BASE_URL = process.env.REACT_APP_API_URL || '/api';
+// Construct API base URL including sub-path for Apache ProxyPass
+const basePath = process.env.REACT_APP_BASE_PATH || '';
+const apiPath = process.env.REACT_APP_API_URL || '/api';
+const API_BASE_URL = basePath + apiPath;
 
 const api = axios.create({
   baseURL: API_BASE_URL,
